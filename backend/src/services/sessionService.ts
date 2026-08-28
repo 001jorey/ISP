@@ -1,6 +1,5 @@
 import { PrismaClient } from '@prisma/client';
 import mikrotikService from './mikrotikService';
-import smsService from './smsService';
 
 const prisma = new PrismaClient();
 
@@ -174,18 +173,6 @@ export const sessionCleanup = async (): Promise<void> => {
 
     for (const session of expiredSessions) {
       await new SessionService().terminateSession(session.id);
-      
-      // Send expiry notification
-      const user = await prisma.user.findUnique({
-        where: { id: session.userId }
-      });
-
-      if (user) {
-        await smsService.sendSMS(
-          user.phone,
-          'Your internet session has expired. Purchase a new plan to continue browsing. - COLLOSPOT'
-        );
-      }
     }
 
     if (expiredSessions.length > 0) {

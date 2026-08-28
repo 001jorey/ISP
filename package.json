@@ -22,14 +22,13 @@
   "keywords": [
     "wifi",
     "billing",
-    "mpesa",
     "mikrotik",
     "kenya",
     "hotspot",
     "captive-portal",
     "react",
     "nodejs",
-    "postgresql"
+    "sqlite"
   ],
   "author": "COLLOSPOT Team",
   "license": "MIT",

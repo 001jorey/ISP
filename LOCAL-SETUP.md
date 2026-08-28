@@ -8,9 +8,14 @@ ways to run it locally: **natively on WSL** (recommended for development) or
 
 ## 1. What this project is
 
-A WiFi hotspot billing system for Kenya: customers pay with **M-Pesa (STK Push)**
-through a captive portal, and the backend creates sessions on a **MikroTik router**
-via its API. Admins manage users, plans, sessions and payments from a dashboard.
+A WiFi hotspot billing system for Kenya: customers browse plans through a
+captive portal, and the backend manages sessions on a **MikroTik router**
+via its API. Admins manage users, plans, sessions and payments from a
+dashboard.
+
+> Note: M-Pesa payment and SMS integrations have been removed from this
+> codebase. The customer portal shows plans, but online payment is disabled —
+> plan activation is handled manually (see the portal's "Contact Us" notice).
 
 ### Stack
 
@@ -19,9 +24,7 @@ via its API. Admins manage users, plans, sessions and payments from a dashboard.
 | Frontend  | React 18 + TypeScript + Vite + Tailwind (customer portal **and** admin dashboard, one app) |
 | Backend   | Node.js 18 + Express + TypeScript (nodemon/ts-node in dev) |
 | Database  | **SQLite via Prisma ORM** — file at `backend/prisma/dev.db` |
-| Payments  | Safaricom Daraja (M-Pesa STK Push) |
 | Router    | MikroTik RouterOS API (`node-routeros`, port 8728) |
-| SMS       | Africa's Talking (optional) |
 
 > ⚠️ **The docs/README mention PostgreSQL, but the Prisma schema is SQLite**
 > (`provider = "sqlite"`, `url = "file:./dev.db"` in `backend/prisma/schema.prisma`).
@@ -36,16 +39,15 @@ Customer's phone ──> Captive portal (React, :3000)
                           ▼
                    Backend API (Express, :5000)
                  ┌────────┼─────────────────┐
-                 ▼        ▼                 ▼
-          SQLite (Prisma)  M-Pesa Daraja   MikroTik router
-          plans/users/     (STK push +     (hotspot users,
-          sessions/pay     callbacks)      profiles, speed limits)
+                 ▼                       ▼
+          SQLite (Prisma)          MikroTik router
+          plans/users/             (hotspot users,
+          sessions/payments        profiles, speed limits)
 ```
 
-**Customer flow:** portal → pick plan → `POST /api/public/payment`
-→ M-Pesa STK push on phone → Daraja calls `POST /api/public/payment/mpesa/callback`
-→ payment marked `COMPLETED` → next status check creates a **session**
-→ session token provisions a MikroTik hotspot user → customer browses.
+**Customer flow:** portal → browse plans → contact support to activate
+(payment is currently disabled) → a **session** is created on the MikroTik
+router → customer browses.
 
 **Admin flow:** login at `/admin` (JWT) → dashboard, users, plans, sessions,
 payments management.
@@ -57,7 +59,7 @@ backend/
   prisma/schema.prisma      # DB models: User, Plan, Session, Payment, Voucher
   src/server.ts             # Express app, routes, cron cleanup (every 5 min)
   src/routes/               # auth, plans, payments, sessions, admin, public
-  src/services/             # mpesaService, mikrotikService, sessionService, smsService
+  src/services/             # mikrotikService, sessionService
   src/database/seed.ts      # seeds admin user + 5 default plans
 frontend/
   src/pages/                # CustomerPortal, AdminLogin, AdminDashboard
@@ -71,8 +73,8 @@ docker-compose.yml          # backend + frontend containers
 - **Email:** `admin@collospot.com`
 - **Password:** `admin123`
 
-M-Pesa keys and MikroTik credentials are **not needed to run the UI** — you'll
-just see API errors in the logs when you try real payments/connects.
+MikroTik credentials are **not needed to run the UI** — you'll just see API
+errors in the logs when something talks to a real router.
 
 ---
 
@@ -121,7 +123,7 @@ cp .env.example .env
 ```
 
 The placeholder values in `.env` are **fine for local UI development**
-(M-Pesa/MikroTik/SMS calls will fail gracefully without real keys).
+(MikroTik calls will simply log errors without a real router).
 Only `JWT_SECRET` matters for auth — change it to any long random string:
 
 ```bash
@@ -201,8 +203,6 @@ Then log in at http://localhost:3000/admin with the credentials above.
 - **MikroTik router access:** put the router's **LAN IP** in `MIKROTIK_HOST`.
   From WSL2 you reach LAN devices directly. If the router is the *Windows host*
   itself, use its WSL-side IP: `ip route show default | awk '{print $3}'`.
-- **M-Pesa sandbox testing:** needs a public callback URL (e.g. ngrok):
-  `ngrok http 5000` and set `MPESA_CALLBACK_URL` to the `https://...` URL.
 - **Reset the database:** stop the server, `rm backend/prisma/dev.db`, then
   re-run `db:push` + `db:seed`.
 - **Stop everything:** `Ctrl+C` in each terminal.
@@ -278,7 +278,6 @@ docker compose up -d --build      # rebuild after code changes
 | Admin login says "Invalid credentials" | Seeding didn't run — `cd backend && npm run db:seed` (or `docker compose exec backend npm run db:seed`). |
 | Plans page empty in the portal | Same — seed the DB, and make sure the backend is actually up (`/health`). |
 | `502`/blank admin pages in dev | Backend down — Vite proxies `/api` to `http://localhost:5000`; start the backend. |
-| M-Pesa "failed" in logs | Expected without real Daraja keys + public callback URL. |
 | Docker build: `prisma: command not found` / `tsc: not found` | You're on the old backend Dockerfile — pull the fixed one. |
 | Slow `npm install` in WSL | Repo lives on `/mnt/c` — move it to `~/projects`. |
 

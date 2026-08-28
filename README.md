@@ -8,9 +8,7 @@ This is a comprehensive WiFi billing system designed specifically for Kenya, fea
 
 ### 🧍♂️ Customer Features
 - **Captive Portal**: Custom-branded login page with mobile-first design
-- **M-Pesa Integration**: STK Push and Paybill payments via Daraja API
 - **Multiple Plans**: Time-based, data-based, and subscription packages
-- **Auto-Connect**: Automatic internet access after payment
 - **Real-time Status**: Connection status and usage monitoring
 - **Multi-language**: English and Swahili support
 
@@ -26,7 +24,6 @@ This is a comprehensive WiFi billing system designed specifically for Kenya, fea
 - **Modern Stack**: React 18 + TypeScript + Node.js + PostgreSQL
 - **Security**: JWT authentication, HTTPS, rate limiting
 - **Scalable**: Cloud-ready with Docker support
-- **Notifications**: SMS alerts via Africa's Talking
 - **API-First**: RESTful API with comprehensive documentation
 
 ## 🏗️ Architecture
@@ -54,11 +51,11 @@ This is a comprehensive WiFi billing system designed specifically for Kenya, fea
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 18+ and npm
-- PostgreSQL 14+
-- MikroTik router with API access
-- M-Pesa Daraja API credentials
-- Africa's Talking SMS API (optional)
+- Node.js 18+ and npm — **or** Docker + Docker Compose v2
+- No database server needed (the app uses SQLite via Prisma, file `backend/prisma/dev.db`)
+- MikroTik router with API access (optional for UI development)
+
+> 📖 **Full step-by-step setup for WSL and Docker:** see [LOCAL-SETUP.md](./LOCAL-SETUP.md)
 
 ### 1. Clone Repository
 ```bash
@@ -116,21 +113,10 @@ DATABASE_URL="postgresql://username:password@localhost:5432/collospot_db"
 # JWT
 JWT_SECRET="your-super-secret-jwt-key-here"
 
-# M-Pesa Daraja API
-MPESA_CONSUMER_KEY="your-mpesa-consumer-key"
-MPESA_CONSUMER_SECRET="your-mpesa-consumer-secret"
-MPESA_SHORTCODE="174379"
-MPESA_PASSKEY="your-mpesa-passkey"
-MPESA_CALLBACK_URL="https://yourdomain.com/api/payments/mpesa/callback"
-
 # MikroTik Router
 MIKROTIK_HOST="192.168.1.1"
 MIKROTIK_USERNAME="admin"
 MIKROTIK_PASSWORD="your-router-password"
-
-# SMS (Africa's Talking)
-AFRICASTALKING_USERNAME="sandbox"
-AFRICASTALKING_API_KEY="your-africastalking-api-key"
 ```
 
 ### Default Admin Credentials
@@ -155,9 +141,7 @@ The system comes with pre-configured plans:
 - `GET /api/public/plans` - Get available plans
 - `POST /api/public/register` - Register new user
 - `POST /api/public/login` - User login
-- `POST /api/public/payment` - Initiate M-Pesa payment
-- `GET /api/public/payment/status/:id` - Check payment status
-- `POST /api/public/connect` - Connect to internet
+- `POST /api/public/connect` - Connect to internet (with a valid session token)
 
 ### Admin API
 - `GET /api/admin/dashboard` - Dashboard statistics
@@ -245,20 +229,14 @@ The system is designed to support a mobile app using the same API:
 
 ### Common Issues
 
-1. **M-Pesa payments failing**
-   - Check Daraja API credentials
-   - Verify callback URL is accessible
-   - Ensure phone number format is correct
-
-2. **Router connection issues**
+1. **Router connection issues**
    - Verify MikroTik API is enabled
    - Check network connectivity
    - Confirm credentials are correct
 
-3. **Database connection errors**
-   - Check PostgreSQL is running
-   - Verify DATABASE_URL format
-   - Ensure database exists
+2. **Database issues**
+   - The database is the SQLite file `backend/prisma/dev.db`
+   - Re-run `npm run db:push` and `npm run db:seed` after schema changes
 
 ### Getting Help
 - Check the logs in `backend/logs/`

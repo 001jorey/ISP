@@ -93,18 +93,6 @@ export interface PaginatedPaymentsResponse {
   pagination: Pagination
 }
 
-export interface PaymentRequest {
-  phone: string
-  planId: string
-  amount: number
-}
-
-export interface PaymentStatusResponse {
-  status: 'pending' | 'completed' | 'failed' | 'timeout'
-  sessionToken?: string
-  amount?: number
-}
-
 export interface ConnectionRequest {
   sessionToken: string
 }

@@ -19,20 +19,10 @@ cp backend/.env.example backend/.env
 ### 2. Update Environment Variables
 Edit `backend/.env` with your actual credentials:
 ```env
-# M-Pesa Daraja API
-MPESA_CONSUMER_KEY="your-actual-consumer-key"
-MPESA_CONSUMER_SECRET="your-actual-consumer-secret"
-MPESA_SHORTCODE="your-shortcode"
-MPESA_PASSKEY="your-passkey"
-MPESA_CALLBACK_URL="https://yourdomain.com/api/public/payment/mpesa/callback"
-
 # MikroTik Router
 MIKROTIK_HOST="192.168.1.1"
 MIKROTIK_USERNAME="admin"
 MIKROTIK_PASSWORD="your-router-password"
-
-# SMS Service
-AFRICASTALKING_API_KEY="your-api-key"
 ```
 
 ### 3. Deploy
@@ -205,30 +195,6 @@ sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
 /ip hotspot user profile add name=default rate-limit=1M/5M session-timeout=1h
 ```
 
-## 📱 M-Pesa Integration Setup
-
-### 1. Daraja API Registration
-1. Visit [Daraja Portal](https://developer.safaricom.co.ke/)
-2. Create account and new app
-3. Get Consumer Key and Consumer Secret
-4. Generate Passkey for your shortcode
-
-### 2. Callback URL Configuration
-- **Sandbox**: Use ngrok for testing
-- **Production**: Use your domain with HTTPS
-
-### 3. Testing
-```bash
-# Test STK Push
-curl -X POST https://yourdomain.com/api/public/payment \
-  -H "Content-Type: application/json" \
-  -d '{
-    "phone": "254712345678",
-    "planId": "plan-id",
-    "amount": 100
-  }'
-```
-
 ## 📊 Monitoring & Maintenance
 
 ### 1. Log Management
@@ -284,12 +250,7 @@ pm2 restart collospot-backend
    - Verify DATABASE_URL in .env
    - Check database credentials
 
-3. **M-Pesa Payments Failing**
-   - Verify callback URL is accessible
-   - Check Daraja API credentials
-   - Review payment logs
-
-4. **Router Connection Issues**
+3. **Router Connection Issues**
    - Test MikroTik API connectivity
    - Verify router credentials
    - Check network connectivity

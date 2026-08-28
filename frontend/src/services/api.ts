@@ -2,8 +2,6 @@ import axios from 'axios'
 import type { 
   ApiResponse, 
   Plan, 
-  PaymentRequest, 
-  PaymentStatusResponse, 
   ConnectionRequest,
   User,
   DashboardStats,
@@ -66,13 +64,6 @@ export const publicAPI = {
 
   login: (data: { phone: string }): Promise<ApiResponse<{ user: User; token: string }>> =>
     publicApi.post('/public/login', data).then(res => res.data),
-
-  // Payments
-  makePayment: (data: PaymentRequest): Promise<ApiResponse<{ checkoutRequestId: string; customerMessage: string }>> =>
-    publicApi.post('/public/payment', data).then(res => res.data),
-
-  getPaymentStatus: (checkoutRequestId: string): Promise<ApiResponse<PaymentStatusResponse>> =>
-    publicApi.get(`/public/payment/status/${checkoutRequestId}`).then(res => res.data),
 
   // Connection
   connect: (data: ConnectionRequest): Promise<ApiResponse<{ message: string; session: any }>> =>

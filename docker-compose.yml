@@ -22,21 +22,11 @@ services:
       JWT_SECRET: "change-me-to-a-long-random-string"
       NODE_ENV: "production"
       PORT: 5000
-      # M-Pesa Daraja API (fill in your real sandbox/production keys)
-      MPESA_CONSUMER_KEY: "your-mpesa-consumer-key"
-      MPESA_CONSUMER_SECRET: "your-mpesa-consumer-secret"
-      MPESA_SHORTCODE: "174379"
-      MPESA_PASSKEY: "your-mpesa-passkey"
-      MPESA_CALLBACK_URL: "http://localhost:5000/api/public/payment/mpesa/callback"
-      MPESA_ENVIRONMENT: "sandbox"
       # MikroTik router — use the router's LAN IP reachable from Docker
       MIKROTIK_HOST: "192.168.1.1"
       MIKROTIK_USERNAME: "admin"
       MIKROTIK_PASSWORD: "your-router-password"
       MIKROTIK_PORT: "8728"
-      # SMS (Africa's Talking)
-      AFRICASTALKING_USERNAME: "sandbox"
-      AFRICASTALKING_API_KEY: "your-africastalking-api-key"
       FRONTEND_URL: "http://localhost:3000"
     ports:
       - "5000:5000"
