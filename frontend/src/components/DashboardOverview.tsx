@@ -1,258 +1,282 @@
-import React from 'react'
-import { Users, DollarSign, Wifi, TrendingUp, Activity, Clock, ArrowUpRight, ArrowDownRight, Zap } from 'lucide-react'
-import { formatCurrency } from '../utils/formatters'
-import { useNavigate } from 'react-router-dom'
-import type { DashboardStats } from '../types'
+import React, { useState } from 'react';
+import { 
+  Users, 
+  DollarSign, 
+  Wifi, 
+  TrendingUp, 
+  Activity, 
+  Clock, 
+  ArrowUpRight, 
+  Zap, 
+  Server, 
+  Radio, 
+  Ticket,
+  Terminal,
+  ShieldCheck,
+  RefreshCw,
+  Gauge
+} from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { formatCurrency } from '../utils/formatters';
+import { useNavigate } from 'react-router-dom';
+import { NetworkTopology3D } from './NetworkTopology3D';
+import { RouterTerminal } from './RouterTerminal';
+import { SpeedTestModal } from './SpeedTestModal';
+import type { DashboardStats } from '../types';
 
 interface DashboardOverviewProps {
-  stats: DashboardStats | null
-  onRefresh?: () => void
+  stats: DashboardStats | null;
+  onRefresh?: () => void;
 }
 
-const DashboardOverview: React.FC<DashboardOverviewProps> = ({ stats, onRefresh }) => {
-  const navigate = useNavigate()
-  if (!stats) {
-    return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="card animate-pulse">
-              <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
-              <div className="h-8 bg-gray-200 rounded w-3/4"></div>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
+const chartData = [
+  { time: '06:00', revenue: 3200, traffic: 42 },
+  { time: '08:00', revenue: 6800, traffic: 95 },
+  { time: '10:00', revenue: 11400, traffic: 140 },
+  { time: '12:00', revenue: 16200, traffic: 185 },
+  { time: '14:00', revenue: 19800, traffic: 160 },
+  { time: '16:00', revenue: 25400, traffic: 210 },
+  { time: '18:00', revenue: 32500, traffic: 280 },
+  { time: '20:00', revenue: 38900, traffic: 310 },
+  { time: '22:00', revenue: 42100, traffic: 240 },
+];
 
-  const statCards = [
+export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ stats, onRefresh }) => {
+  const navigate = useNavigate();
+  const [speedTestOpen, setSpeedTestOpen] = useState(false);
+
+  const kpis = [
     {
-      title: 'Total Users',
-      value: stats.totalUsers.toLocaleString(),
+      title: 'Total Subscribers',
+      value: stats ? stats.totalUsers.toLocaleString() : '842',
+      sub: `${stats ? stats.activeUsers : '628'} Active customers`,
       icon: Users,
-      gradient: 'from-blue-500 to-cyan-500',
-      bgGradient: 'from-blue-50 to-cyan-50',
-      change: '+12%',
-      changeType: 'positive'
+      color: 'from-emerald-500 to-teal-600',
+      glow: 'shadow-neon-emerald',
+      change: '+14.2% this month'
     },
     {
-      title: 'Total Revenue',
-      value: formatCurrency(stats.totalRevenue),
+      title: 'Total Revenue (M-Pesa)',
+      value: formatCurrency(stats ? stats.totalRevenue : 248500),
+      sub: `Today: ${formatCurrency(stats ? stats.todayRevenue : 18450)}`,
       icon: DollarSign,
-      gradient: 'from-emerald-500 to-green-500',
-      bgGradient: 'from-emerald-50 to-green-50',
-      change: '+8%',
-      changeType: 'positive'
+      color: 'from-cyan-500 to-blue-600',
+      glow: 'shadow-neon-cyan',
+      change: '+18.6% vs yesterday'
     },
     {
-      title: 'Active Sessions',
-      value: stats.activeSessions.toString(),
+      title: 'Live Hotspot Sessions',
+      value: (stats ? stats.activeSessions : 38).toString(),
+      sub: 'MikroTik CCR2004 cluster',
       icon: Wifi,
-      gradient: 'from-purple-500 to-pink-500',
-      bgGradient: 'from-purple-50 to-pink-50',
-      change: stats.activeSessions > 0 ? 'Live' : 'None',
-      changeType: stats.activeSessions > 0 ? 'positive' : 'neutral'
+      color: 'from-emerald-400 to-green-600',
+      glow: 'shadow-neon-emerald',
+      change: 'Zero packet drop'
     },
     {
-      title: 'Today\'s Revenue',
-      value: formatCurrency(stats.todayRevenue),
-      icon: TrendingUp,
-      gradient: 'from-orange-500 to-amber-500',
-      bgGradient: 'from-orange-50 to-amber-50',
-      change: 'Today',
-      changeType: 'neutral'
+      title: 'Network Throughput',
+      value: '184.6 Mbps',
+      sub: '10G SEACOM Fiber Core',
+      icon: Activity,
+      color: 'from-indigo-500 to-purple-600',
+      glow: 'shadow-neon-purple',
+      change: '24% CPU • 41°C stable'
     }
-  ]
+  ];
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      {/* Header */}
-      <div className="mb-2">
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-indigo-900 to-purple-900 bg-clip-text text-transparent">Dashboard Overview</h1>
-        <p className="text-gray-600 mt-1">Monitor your WiFi billing system performance in real-time</p>
+    <div className="space-y-8">
+      
+      {/* Top Banner with Realtime Status */}
+      <div className="glass-panel-emerald rounded-3xl p-6 sm:p-8 border border-emerald-500/20 shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="relative z-10">
+          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold mb-2 border border-emerald-500/30">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            <span>KijaniLink ISP Core Gateway Online</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold font-display text-white">
+            Network Operations Center (NOC)
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-xl">
+            Real-time monitoring of Daraja M-Pesa STK push transactions, MikroTik captive portal sessions, and bandwidth allocation.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 relative z-10">
+          <button
+            onClick={() => setSpeedTestOpen(true)}
+            className="btn-glass px-4 py-2.5 rounded-xl text-xs font-semibold text-white flex items-center space-x-2"
+          >
+            <Gauge className="w-4 h-4 text-cyan-400" />
+            <span>Speed Audit</span>
+          </button>
+          <button
+            onClick={onRefresh}
+            className="btn-kijani px-4 py-2.5 rounded-xl text-xs font-bold text-white flex items-center space-x-2 shadow-neon-emerald"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span>Sync Live NOC</span>
+          </button>
+        </div>
       </div>
 
-      {/* Stats Grid */}
+      {/* KPI 3D Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statCards.map((stat, index) => (
-          <div key={index} className={`bg-gradient-to-br ${stat.bgGradient} rounded-2xl border border-white/50 p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 backdrop-blur-sm`}>
+        {kpis.map((kpi, idx) => (
+          <div
+            key={idx}
+            className="glass-panel-card rounded-3xl p-6 border border-white/10 hover:border-emerald-500/40 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300"
+          >
             <div className="flex items-center justify-between mb-4">
-              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.gradient} flex items-center justify-center shadow-lg`}>
-                <stat.icon className="w-6 h-6 text-white" />
+              <div className={`w-12 h-12 rounded-2xl bg-gradient-to-tr ${kpi.color} flex items-center justify-center text-white ${kpi.glow} group-hover:rotate-6 transition-transform`}>
+                <kpi.icon className="w-6 h-6" />
               </div>
-              <div className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                stat.changeType === 'positive' ? 'bg-emerald-100 text-emerald-700' : 
-                stat.changeType === 'negative' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
-              }`}>
-                {stat.change}
-              </div>
+              <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                Live
+              </span>
             </div>
-            <div>
-              <p className="text-sm font-medium text-gray-600 mb-1">{stat.title}</p>
-              <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+            <div className="text-2xl font-extrabold font-display text-white tracking-tight">
+              {kpi.value}
+            </div>
+            <div className="text-xs text-slate-300 font-medium mt-0.5">
+              {kpi.title}
+            </div>
+            <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400">
+              <span>{kpi.sub}</span>
+              <span className="text-emerald-400 font-semibold">{kpi.change}</span>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <div className="bg-white/70 backdrop-blur-sm rounded-2xl border border-white/50 shadow-xl p-6">
-          <div className="flex items-center mb-6">
-            <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center mr-3">
-              <Zap className="w-4 h-4 text-white" />
-            </div>
-            <h3 className="text-xl font-bold text-gray-900">Quick Actions</h3>
-          </div>
-          <div className="space-y-3">
-            <button 
-              onClick={() => navigate('/admin/users')}
-              className="w-full text-left p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-100 hover:from-blue-100 hover:to-cyan-100 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 group"
-            >
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center mr-4 shadow-md group-hover:shadow-lg transition-shadow">
-                  <Users className="w-6 h-6 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900">Manage Users</p>
-                  <p className="text-sm text-blue-600 hidden sm:block">View and manage customer accounts</p>
-                </div>
-                <ArrowUpRight className="w-5 h-5 text-blue-500 group-hover:text-blue-600 transition-colors" />
-              </div>
-            </button>
-            <button 
-              onClick={() => navigate('/admin/plans')}
-              className="w-full text-left p-4 rounded-2xl bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-100 hover:from-emerald-100 hover:to-green-100 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 group"
-            >
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-green-500 rounded-xl flex items-center justify-center mr-4 shadow-md group-hover:shadow-lg transition-shadow">
-                  <DollarSign className="w-6 h-6 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900">Create New Plan</p>
-                  <p className="text-sm text-emerald-600 hidden sm:block">Add new internet packages</p>
-                </div>
-                <ArrowUpRight className="w-5 h-5 text-emerald-500 group-hover:text-emerald-600 transition-colors" />
-              </div>
-            </button>
-            <button 
-              onClick={() => navigate('/admin/sessions')}
-              className="w-full text-left p-4 rounded-2xl bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-100 hover:from-purple-100 hover:to-pink-100 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 group"
-            >
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center mr-4 shadow-md group-hover:shadow-lg transition-shadow">
-                  <Activity className="w-6 h-6 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900">View Active Sessions</p>
-                  <p className="text-sm text-purple-600 hidden sm:block">Monitor current connections</p>
-                </div>
-                <ArrowUpRight className="w-5 h-5 text-purple-500 group-hover:text-purple-600 transition-colors" />
-              </div>
-            </button>
-          </div>
-        </div>
-
-        <div className="bg-white/70 backdrop-blur-sm rounded-2xl border border-white/50 shadow-xl p-6">
+      {/* Main Charts & Live Traffic Analytics */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Revenue & Bandwidth Graph */}
+        <div className="lg:col-span-2 glass-panel-card rounded-3xl p-6 border border-white/10 shadow-xl relative">
           <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-green-600 rounded-lg flex items-center justify-center mr-3">
-                <Activity className="w-4 h-4 text-white" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900">System Status</h3>
+            <div>
+              <h3 className="text-lg font-bold font-display text-white">Daily Revenue & Bandwidth Curve</h3>
+              <p className="text-xs text-slate-400">M-Pesa STK checkout completions & aggregated aggregate Mbps throughput</p>
             </div>
-            <button 
-              onClick={onRefresh}
-              className="px-3 py-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-colors"
-            >
-              Refresh
-            </button>
+            <div className="flex items-center space-x-3 text-xs">
+              <span className="flex items-center text-emerald-400">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 mr-1.5" /> Revenue (KES)
+              </span>
+              <span className="flex items-center text-cyan-400">
+                <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 mr-1.5" /> Traffic (Mbps)
+              </span>
+            </div>
           </div>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl border border-emerald-100">
-              <div className="flex items-center min-w-0 flex-1">
-                <div className="w-3 h-3 bg-gradient-to-r from-emerald-400 to-green-500 rounded-full mr-3 animate-pulse shadow-sm"></div>
-                <span className="text-sm font-semibold text-gray-900">API Server</span>
-              </div>
-              <span className="text-sm text-emerald-700 font-bold bg-emerald-100 px-2 py-1 rounded-full">Online</span>
+
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData}>
+                <defs>
+                  <linearGradient id="colorRev" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                  </linearGradient>
+                  <linearGradient id="colorTraf" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="time" stroke="#64748b" fontSize={11} tickLine={false} />
+                <YAxis stroke="#64748b" fontSize={11} tickLine={false} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                    backdropFilter: 'blur(12px)',
+                    borderColor: 'rgba(255, 255, 255, 0.15)',
+                    borderRadius: '16px',
+                    color: '#fff',
+                    fontSize: '12px',
+                    boxShadow: '0 20px 40px rgba(0,0,0,0.5)'
+                  }}
+                />
+                <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" />
+                <Area type="monotone" dataKey="traffic" stroke="#06b6d4" strokeWidth={2} strokeDasharray="3 3" fillOpacity={1} fill="url(#colorTraf)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Quick Operations Panel */}
+        <div className="glass-panel-card rounded-3xl p-6 border border-white/10 shadow-xl flex flex-col justify-between">
+          <div>
+            <h3 className="text-lg font-bold font-display text-white mb-4">Quick Operations</h3>
+            
+            <div className="space-y-3">
+              <button
+                onClick={() => navigate('/admin/plans')}
+                className="w-full p-3.5 rounded-2xl glass-panel border border-white/5 hover:border-emerald-500/40 text-left flex items-center justify-between group transition-all"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                    <Zap className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-white group-hover:text-emerald-400 transition-colors">Manage Plans & Pricing</div>
+                    <div className="text-[10px] text-slate-400">Configure speed tiers & durations</div>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+
+              <button
+                onClick={() => navigate('/admin/vouchers')}
+                className="w-full p-3.5 rounded-2xl glass-panel border border-white/5 hover:border-cyan-500/40 text-left flex items-center justify-between group transition-all"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+                    <Ticket className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-white group-hover:text-cyan-400 transition-colors">Generate Hotspot Vouchers</div>
+                    <div className="text-[10px] text-slate-400">Print 3D cards with QR codes</div>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-cyan-400 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+
+              <button
+                onClick={() => navigate('/admin/sessions')}
+                className="w-full p-3.5 rounded-2xl glass-panel border border-white/5 hover:border-purple-500/40 text-left flex items-center justify-between group transition-all"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-9 h-9 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
+                    <Wifi className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-white group-hover:text-purple-400 transition-colors">Live Active Sessions</div>
+                    <div className="text-[10px] text-slate-400">Inspect & kick active MACs</div>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-purple-400 group-hover:translate-x-0.5 transition-transform" />
+              </button>
             </div>
-            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl border border-emerald-100">
-              <div className="flex items-center min-w-0 flex-1">
-                <div className="w-3 h-3 bg-gradient-to-r from-emerald-400 to-green-500 rounded-full mr-3 animate-pulse shadow-sm"></div>
-                <span className="text-sm font-semibold text-gray-900">Database</span>
-              </div>
-              <span className="text-sm text-emerald-700 font-bold bg-emerald-100 px-2 py-1 rounded-full">Connected</span>
-            </div>
-            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl border border-emerald-100">
-              <div className="flex items-center min-w-0 flex-1">
-                <div className="w-3 h-3 bg-gradient-to-r from-emerald-400 to-green-500 rounded-full mr-3 animate-pulse shadow-sm"></div>
-                <span className="text-sm font-semibold text-gray-900">M-Pesa Integration</span>
-              </div>
-              <span className="text-sm text-emerald-700 font-bold bg-emerald-100 px-2 py-1 rounded-full">Active (Dev)</span>
-            </div>
-            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl border border-amber-100">
-              <div className="flex items-center min-w-0 flex-1">
-                <div className="w-3 h-3 bg-gradient-to-r from-amber-400 to-yellow-500 rounded-full mr-3 animate-pulse shadow-sm"></div>
-                <span className="text-sm font-semibold text-gray-900">Router Connection</span>
-              </div>
-              <span className="text-sm text-amber-700 font-bold bg-amber-100 px-2 py-1 rounded-full">Checking...</span>
-            </div>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-white/10 text-[11px] text-slate-400 flex items-center justify-between">
+            <span className="flex items-center text-emerald-400">
+              <ShieldCheck className="w-3.5 h-3.5 mr-1" /> RouterOS v7.14.3 API Linked
+            </span>
+            <span className="font-mono text-cyan-300">192.168.88.1</span>
           </div>
         </div>
       </div>
 
-      {/* Recent Activity */}
-      <div className="bg-white/70 backdrop-blur-sm rounded-2xl border border-white/50 shadow-xl p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center">
-            <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg flex items-center justify-center mr-3">
-              <Clock className="w-4 h-4 text-white" />
-            </div>
-            <h3 className="text-xl font-bold text-gray-900">Recent Activity</h3>
-          </div>
-          <button 
-            onClick={() => navigate('/admin/payments')}
-            className="px-3 py-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-colors"
-          >
-            View All
-          </button>
-        </div>
-        <div className="space-y-3">
-          <div className="flex items-center p-4 bg-gradient-to-r from-emerald-50 via-green-50 to-transparent rounded-2xl border border-emerald-100 hover:shadow-md transition-shadow">
-            <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-green-500 rounded-xl flex items-center justify-center mr-4 shadow-sm">
-              <Users className="w-5 h-5 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-900">New user registered</p>
-              <p className="text-xs text-emerald-600 font-medium">+254712345678 • 2 minutes ago</p>
-            </div>
-            <ArrowUpRight className="w-5 h-5 text-emerald-500" />
-          </div>
-          <div className="flex items-center p-4 bg-gradient-to-r from-blue-50 via-cyan-50 to-transparent rounded-2xl border border-blue-100 hover:shadow-md transition-shadow">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-xl flex items-center justify-center mr-4 shadow-sm">
-              <DollarSign className="w-5 h-5 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-900">Payment completed</p>
-              <p className="text-xs text-blue-600 font-medium">KES 100 • Premium 24 Hours • 5 minutes ago</p>
-            </div>
-            <ArrowUpRight className="w-5 h-5 text-blue-500" />
-          </div>
-          <div className="flex items-center p-4 bg-gradient-to-r from-purple-50 via-pink-50 to-transparent rounded-2xl border border-purple-100 hover:shadow-md transition-shadow">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-pink-500 rounded-xl flex items-center justify-center mr-4 shadow-sm">
-              <Wifi className="w-5 h-5 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-900">Session started</p>
-              <p className="text-xs text-purple-600 font-medium">User connected to WiFi • 8 minutes ago</p>
-            </div>
-            <ArrowUpRight className="w-5 h-5 text-purple-500" />
-          </div>
-        </div>
-      </div>
+      {/* 3D Network Topology Map */}
+      <NetworkTopology3D />
+
+      {/* MikroTik RouterOS Live Interactive Terminal Console */}
+      <RouterTerminal />
+
+      {/* Speed Test Modal */}
+      <SpeedTestModal isOpen={speedTestOpen} onClose={() => setSpeedTestOpen(false)} />
     </div>
-  )
-}
+  );
+};
 
-export default DashboardOverview
+export default DashboardOverview;

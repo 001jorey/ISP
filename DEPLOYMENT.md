@@ -1,332 +1,141 @@
-# COLLOSPOT Deployment Guide
+# 🌿 KijaniLink — Local & Production Deployment Manual
 
-This guide covers different deployment options for the COLLOSPOT WiFi Billing System.
+This guide covers deploying KijaniLink on:
+1. Local Workstation (Offline or Connected)
+2. Standalone Downloadable Bundle
+3. Linux VPS (Ubuntu 22.04 / 24.04 with Nginx & SSL)
+4. Docker & Docker Compose
+5. MikroTik RouterOS Hardware Integration
 
-## 🚀 Quick Deployment with Docker
+---
+
+## 1. Local Deployment with Zip Bundle
+
+1. Extract the downloaded `kijanilink-deployment-package.zip`:
+   ```bash
+   unzip kijanilink-deployment-package.zip -d kijanilink
+   cd kijanilink
+   ```
+2. Run the automated installer:
+   ```bash
+   ./install.sh
+   ```
+3. Start the application:
+   ```bash
+   ./start.sh
+   ```
+   Or on Windows:
+   ```cmd
+   start.bat
+   ```
+4. Access:
+   - **Customer Captive Portal**: http://localhost:3000
+   - **Admin Operations Center**: http://localhost:3000/admin (User: `admin@kijanilink.com` / `admin123`)
+
+---
+
+## 2. Standalone Single-Port Deployment
+
+For low-power microcomputers (Raspberry Pi, Orange Pi, mini PC, local server connected to MikroTik LAN):
+```bash
+node start-offline.js
+```
+Runs everything seamlessly on port `3000` with zero external dependencies.
+
+---
+
+## 3. Production Deployment on Ubuntu VPS
 
 ### Prerequisites
-- Docker and Docker Compose installed
-- Domain name (for production)
-- SSL certificates (for HTTPS)
+- Ubuntu 22.04 / 24.04 LTS
+- Domain name pointed to VPS IP (e.g. `wifi.yourdomain.co.ke`)
+- Node.js 20+
 
-### 1. Clone and Configure
+### Step-by-Step
 ```bash
-git clone <repository-url>
-cd wifi-billing-system
-cp backend/.env.example backend/.env
-```
-
-### 2. Update Environment Variables
-Edit `backend/.env` with your actual credentials:
-```env
-# M-Pesa Daraja API
-MPESA_CONSUMER_KEY="your-actual-consumer-key"
-MPESA_CONSUMER_SECRET="your-actual-consumer-secret"
-MPESA_SHORTCODE="your-shortcode"
-MPESA_PASSKEY="your-passkey"
-MPESA_CALLBACK_URL="https://yourdomain.com/api/public/payment/mpesa/callback"
-
-# MikroTik Router
-MIKROTIK_HOST="192.168.1.1"
-MIKROTIK_USERNAME="admin"
-MIKROTIK_PASSWORD="your-router-password"
-
-# SMS Service
-AFRICASTALKING_API_KEY="your-api-key"
-```
-
-### 3. Deploy
-```bash
-docker-compose up -d
-```
-
-### 4. Initialize Database
-```bash
-docker-compose exec backend npm run db:seed
-```
-
-## 🌐 Production Deployment (AWS/DigitalOcean)
-
-### Server Requirements
-- **CPU**: 2+ cores
-- **RAM**: 4GB minimum, 8GB recommended
-- **Storage**: 50GB SSD
-- **OS**: Ubuntu 20.04 LTS or newer
-
-### 1. Server Setup
-```bash
-# Update system
+# 1. Update system & install Node.js + PM2 + Nginx
 sudo apt update && sudo apt upgrade -y
-
-# Install Node.js 18
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-sudo apt-get install -y nodejs
-
-# Install PostgreSQL
-sudo apt install postgresql postgresql-contrib -y
-
-# Install Nginx
-sudo apt install nginx -y
-
-# Install PM2 for process management
+sudo apt install -y curl git nginx
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
 sudo npm install -g pm2
-```
 
-### 2. Database Setup
-```bash
-# Switch to postgres user
-sudo -u postgres psql
+# 2. Clone repository & build
+git clone <your-repo-url> /var/www/kijanilink
+cd /var/www/kijanilink
+./install.sh
 
-# Create database and user
-CREATE DATABASE collospot_db;
-CREATE USER collospot WITH ENCRYPTED PASSWORD 'your-secure-password';
-GRANT ALL PRIVILEGES ON DATABASE collospot_db TO collospot;
-\q
-```
-
-### 3. Application Deployment
-```bash
-# Clone repository
-git clone <repository-url> /var/www/collospot
-cd /var/www/collospot
-
-# Backend setup
-cd backend
-npm install
-cp .env.example .env
-# Edit .env with production values
-npm run build
-npm run db:generate
-npm run db:push
-npm run db:seed
-
-# Frontend setup
-cd ../frontend
-npm install
-npm run build
-```
-
-### 4. PM2 Configuration
-Create `ecosystem.config.js`:
-```javascript
-module.exports = {
-  apps: [{
-    name: 'collospot-backend',
-    script: 'dist/server.js',
-    cwd: '/var/www/collospot/backend',
-    instances: 'max',
-    exec_mode: 'cluster',
-    env: {
-      NODE_ENV: 'production',
-      PORT: 5000
-    }
-  }]
-}
-```
-
-Start with PM2:
-```bash
-pm2 start ecosystem.config.js
-pm2 save
+# 3. Start Backend with PM2
+cd /var/www/kijanilink/backend
+pm2 start dist/server.js --name "kijanilink-backend"
 pm2 startup
+pm2 save
+
+# 4. Configure Nginx Reverse Proxy
+sudo nano /etc/nginx/sites-available/kijanilink
 ```
 
-### 5. Nginx Configuration
-Create `/etc/nginx/sites-available/collospot`:
+Nginx configuration block:
 ```nginx
 server {
     listen 80;
-    server_name yourdomain.com www.yourdomain.com;
-    return 301 https://$server_name$request_uri;
-}
+    server_name wifi.yourdomain.co.ke;
 
-server {
-    listen 443 ssl http2;
-    server_name yourdomain.com www.yourdomain.com;
+    # Frontend compiled assets
+    root /var/www/kijanilink/frontend/dist;
+    index index.html;
 
-    ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
-
-    # Frontend
     location / {
-        root /var/www/collospot/frontend/dist;
         try_files $uri $uri/ /index.html;
     }
 
-    # Backend API
+    # Backend API proxy
     location /api/ {
-        proxy_pass http://localhost:5000/api/;
+        proxy_pass http://127.0.0.1:5000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
         proxy_cache_bypass $http_upgrade;
     }
 }
 ```
 
-Enable site:
 ```bash
-sudo ln -s /etc/nginx/sites-available/collospot /etc/nginx/sites-enabled/
+# Enable site & obtain SSL certificate
+sudo ln -s /etc/nginx/sites-available/kijanilink /etc/nginx/sites-enabled/
 sudo nginx -t
-sudo systemctl reload nginx
+sudo systemctl restart nginx
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d wifi.yourdomain.co.ke
 ```
-
-### 6. SSL Certificate (Let's Encrypt)
-```bash
-sudo apt install certbot python3-certbot-nginx -y
-sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
-```
-
-## 🔧 MikroTik Router Configuration
-
-### 1. Enable API
-```bash
-/ip service enable api
-/ip service set api port=8728
-```
-
-### 2. Create API User
-```bash
-/user add name=collospot password=secure-password group=full
-```
-
-### 3. Hotspot Setup
-```bash
-# Create hotspot interface
-/interface bridge add name=hotspot-bridge
-/ip hotspot add name=collospot interface=hotspot-bridge
-
-# Configure hotspot
-/ip hotspot profile add name=collospot-profile
-/ip hotspot user profile add name=default rate-limit=1M/5M session-timeout=1h
-```
-
-## 📱 M-Pesa Integration Setup
-
-### 1. Daraja API Registration
-1. Visit [Daraja Portal](https://developer.safaricom.co.ke/)
-2. Create account and new app
-3. Get Consumer Key and Consumer Secret
-4. Generate Passkey for your shortcode
-
-### 2. Callback URL Configuration
-- **Sandbox**: Use ngrok for testing
-- **Production**: Use your domain with HTTPS
-
-### 3. Testing
-```bash
-# Test STK Push
-curl -X POST https://yourdomain.com/api/public/payment \
-  -H "Content-Type: application/json" \
-  -d '{
-    "phone": "254712345678",
-    "planId": "plan-id",
-    "amount": 100
-  }'
-```
-
-## 📊 Monitoring & Maintenance
-
-### 1. Log Management
-```bash
-# View backend logs
-pm2 logs collospot-backend
-
-# View Nginx logs
-sudo tail -f /var/log/nginx/access.log
-sudo tail -f /var/log/nginx/error.log
-```
-
-### 2. Database Backup
-```bash
-# Create backup script
-#!/bin/bash
-DATE=$(date +%Y%m%d_%H%M%S)
-pg_dump -U collospot -h localhost collospot_db > /backups/collospot_$DATE.sql
-```
-
-### 3. System Updates
-```bash
-# Update application
-cd /var/www/collospot
-git pull origin main
-cd backend && npm install && npm run build
-cd ../frontend && npm install && npm run build
-pm2 restart collospot-backend
-```
-
-## 🔒 Security Checklist
-
-- [ ] SSL certificate installed and configured
-- [ ] Database password is strong and unique
-- [ ] JWT secret is cryptographically secure
-- [ ] API keys are kept secret and not in version control
-- [ ] Firewall configured (UFW recommended)
-- [ ] Regular security updates scheduled
-- [ ] Backup strategy implemented
-- [ ] Monitoring and alerting set up
-
-## 🆘 Troubleshooting
-
-### Common Issues
-
-1. **502 Bad Gateway**
-   - Check if backend is running: `pm2 status`
-   - Check backend logs: `pm2 logs collospot-backend`
-   - Verify port 5000 is not blocked
-
-2. **Database Connection Error**
-   - Check PostgreSQL status: `sudo systemctl status postgresql`
-   - Verify DATABASE_URL in .env
-   - Check database credentials
-
-3. **M-Pesa Payments Failing**
-   - Verify callback URL is accessible
-   - Check Daraja API credentials
-   - Review payment logs
-
-4. **Router Connection Issues**
-   - Test MikroTik API connectivity
-   - Verify router credentials
-   - Check network connectivity
-
-### Performance Optimization
-
-1. **Database Optimization**
-   ```sql
-   -- Add indexes for better performance
-   CREATE INDEX idx_sessions_user_id ON sessions(user_id);
-   CREATE INDEX idx_payments_status ON payments(status);
-   CREATE INDEX idx_sessions_status ON sessions(status);
-   ```
-
-2. **Nginx Caching**
-   ```nginx
-   # Add to server block
-   location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
-       expires 1y;
-       add_header Cache-Control "public, immutable";
-   }
-   ```
-
-3. **PM2 Cluster Mode**
-   ```javascript
-   // In ecosystem.config.js
-   instances: 'max',
-   exec_mode: 'cluster'
-   ```
-
-## 📞 Support
-
-For deployment assistance:
-- **Email**: support@collospot.com
-- **Documentation**: Check README.md
-- **Issues**: Create GitHub issue
 
 ---
 
-**Happy Deploying!** 🚀
+## 4. Environment Variables Reference
+
+Create `.env` inside `backend/`:
+```env
+# Server
+PORT=5000
+NODE_ENV=production
+JWT_SECRET=super_secret_kijanilink_key_change_in_production
+
+# M-Pesa Daraja 2.0 Credentials
+MPESA_ENVIRONMENT=production # or sandbox
+MPESA_CONSUMER_KEY=your_daraja_consumer_key
+MPESA_CONSUMER_SECRET=your_daraja_consumer_secret
+MPESA_SHORTCODE=174379 # Your Paybill or Till number
+MPESA_PASSKEY=your_daraja_passkey
+MPESA_CALLBACK_URL=https://wifi.yourdomain.co.ke/api/public/payment/mpesa/callback
+
+# MikroTik RouterOS API
+MIKROTIK_HOST=192.168.88.1
+MIKROTIK_PORT=8728
+MIKROTIK_USERNAME=admin
+MIKROTIK_PASSWORD=your_router_password
+
+# Africa's Talking SMS Gateway
+AFRICASTALKING_USERNAME=sandbox
+AFRICASTALKING_API_KEY=your_africastalking_api_key
+```

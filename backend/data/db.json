@@ -1,0 +1,223 @@
+{
+  "users": [
+    {
+      "id": "usr-admin-01",
+      "email": "admin@kijanilink.com",
+      "phone": "+254700000001",
+      "password": "$2a$10$3aY3HlcUAf6.wdIsrDbJTOheYATxI8udAS7d/VM1sNyW0Di14acRC",
+      "firstName": "Kijani",
+      "lastName": "Admin",
+      "role": "ADMIN",
+      "isActive": true,
+      "createdAt": "2026-08-28T14:13:30.575Z",
+      "updatedAt": "2026-08-28T14:13:30.575Z"
+    },
+    {
+      "id": "usr-cust-01",
+      "email": "mwangi@gmail.com",
+      "phone": "+254712345678",
+      "firstName": "Mwangi",
+      "lastName": "Kariuki",
+      "role": "CUSTOMER",
+      "isActive": true,
+      "createdAt": "2026-08-25T14:13:30.575Z",
+      "updatedAt": "2026-08-28T14:13:30.575Z"
+    },
+    {
+      "id": "usr-cust-02",
+      "email": "chebet@yahoo.com",
+      "phone": "+254723456789",
+      "firstName": "Faith",
+      "lastName": "Chebet",
+      "role": "CUSTOMER",
+      "isActive": true,
+      "createdAt": "2026-08-21T14:13:30.575Z",
+      "updatedAt": "2026-08-28T14:13:30.575Z"
+    },
+    {
+      "id": "usr-cust-03",
+      "email": "otieno@outlook.com",
+      "phone": "+254734567890",
+      "firstName": "Brian",
+      "lastName": "Otieno",
+      "role": "CUSTOMER",
+      "isActive": true,
+      "createdAt": "2026-08-14T14:13:30.575Z",
+      "updatedAt": "2026-08-28T14:13:30.575Z"
+    }
+  ],
+  "plans": [
+    {
+      "id": "plan-1hr",
+      "name": "Turbo Pass (1 Hour)",
+      "description": "Ultra-fast high-speed connection for quick tasks & video streaming",
+      "price": 20,
+      "duration": 1,
+      "dataLimit": "1.5GB",
+      "speedLimit": "15 Mbps",
+      "isActive": true,
+      "createdAt": "2026-08-28T14:13:30.575Z",
+      "updatedAt": "2026-08-28T14:13:30.575Z"
+    },
+    {
+      "id": "plan-3hr",
+      "name": "Power Session (3 Hours)",
+      "description": "Ideal for remote meetings, Netflix series & heavy research",
+      "price": 50,
+      "duration": 3,
+      "dataLimit": "5GB",
+      "speedLimit": "25 Mbps",
+      "isActive": true,
+      "createdAt": "2026-08-28T14:13:30.575Z",
+      "updatedAt": "2026-08-28T14:13:30.575Z"
+    },
+    {
+      "id": "plan-24hr",
+      "name": "24-Hour Day Pass",
+      "description": "Full day non-stop gaming, 4K streaming & unlimited downloads",
+      "price": 150,
+      "duration": 24,
+      "dataLimit": "Unlimited",
+      "speedLimit": "35 Mbps",
+      "isActive": true,
+      "createdAt": "2026-08-28T14:13:30.575Z",
+      "updatedAt": "2026-08-28T14:13:30.575Z"
+    },
+    {
+      "id": "plan-7day",
+      "name": "Weekly Kijani Pro (7 Days)",
+      "description": "High priority bandwidth with 24/7 dedicated stability",
+      "price": 750,
+      "duration": 168,
+      "dataLimit": "Unlimited",
+      "speedLimit": "50 Mbps",
+      "isActive": true,
+      "createdAt": "2026-08-28T14:13:30.575Z",
+      "updatedAt": "2026-08-28T14:13:30.575Z"
+    },
+    {
+      "id": "plan-30day",
+      "name": "Monthly Fiber Ultimate (30 Days)",
+      "description": "Maximum speed tier with zero throttling and VIP support",
+      "price": 2500,
+      "duration": 720,
+      "dataLimit": "Unlimited",
+      "speedLimit": "100 Mbps",
+      "isActive": true,
+      "createdAt": "2026-08-28T14:13:30.575Z",
+      "updatedAt": "2026-08-28T14:13:30.575Z"
+    }
+  ],
+  "sessions": [
+    {
+      "id": "sess-001",
+      "userId": "usr-cust-01",
+      "planId": "plan-1hr",
+      "macAddress": "DC:A6:32:89:12:FA",
+      "ipAddress": "192.168.88.145",
+      "startTime": "2026-08-28T13:48:30.575Z",
+      "endTime": "2026-08-28T14:48:30.575Z",
+      "status": "ACTIVE",
+      "dataUsed": 508559360,
+      "sessionToken": "kj_live_tok_89a1f29",
+      "routerSessionId": "*4F",
+      "createdAt": "2026-08-28T13:48:30.575Z",
+      "updatedAt": "2026-08-28T14:13:30.575Z"
+    },
+    {
+      "id": "sess-002",
+      "userId": "usr-cust-02",
+      "planId": "plan-7day",
+      "macAddress": "A4:C3:F0:4B:92:11",
+      "ipAddress": "192.168.88.172",
+      "startTime": "2026-08-28T06:13:30.575Z",
+      "endTime": "2026-09-04T06:13:30.575Z",
+      "status": "ACTIVE",
+      "dataUsed": 4005560320,
+      "sessionToken": "kj_live_tok_11a8bc4",
+      "routerSessionId": "*5A",
+      "createdAt": "2026-08-28T06:13:30.575Z",
+      "updatedAt": "2026-08-28T14:13:30.575Z"
+    }
+  ],
+  "payments": [
+    {
+      "id": "pay-001",
+      "userId": "usr-cust-01",
+      "planId": "plan-24hr",
+      "amount": 150,
+      "mpesaReceiptNumber": "SHK89XJ2Q7",
+      "checkoutRequestId": "ws_CO_28082026_01",
+      "status": "COMPLETED",
+      "paymentMethod": "MPESA_STK",
+      "createdAt": "2026-08-28T12:13:30.575Z",
+      "updatedAt": "2026-08-28T12:13:30.575Z"
+    },
+    {
+      "id": "pay-002",
+      "userId": "usr-cust-02",
+      "planId": "plan-7day",
+      "amount": 750,
+      "mpesaReceiptNumber": "SHK90LM8P2",
+      "checkoutRequestId": "ws_CO_28082026_02",
+      "status": "COMPLETED",
+      "paymentMethod": "MPESA_STK",
+      "createdAt": "2026-08-28T06:13:30.575Z",
+      "updatedAt": "2026-08-28T06:13:30.575Z"
+    },
+    {
+      "id": "pay-003",
+      "userId": "usr-cust-03",
+      "planId": "plan-30day",
+      "amount": 2500,
+      "mpesaReceiptNumber": "SHK91ZZ4K9",
+      "checkoutRequestId": "ws_CO_28082026_03",
+      "status": "COMPLETED",
+      "paymentMethod": "MPESA_STK",
+      "createdAt": "2026-08-27T14:13:30.575Z",
+      "updatedAt": "2026-08-27T14:13:30.575Z"
+    },
+    {
+      "id": "pay-004",
+      "userId": "usr-cust-01",
+      "planId": "plan-1hr",
+      "amount": 20,
+      "mpesaReceiptNumber": "SHK92AA1B3",
+      "checkoutRequestId": "ws_CO_28082026_04",
+      "status": "COMPLETED",
+      "paymentMethod": "MPESA_STK",
+      "createdAt": "2026-08-28T13:48:30.575Z",
+      "updatedAt": "2026-08-28T13:48:30.575Z"
+    }
+  ],
+  "vouchers": [
+    {
+      "id": "vch-001",
+      "code": "KIJANI-9821-SPEED",
+      "planId": "plan-1hr",
+      "amount": 20,
+      "isRedeemed": false,
+      "expiresAt": "2026-09-27T14:13:30.575Z",
+      "createdAt": "2026-08-28T14:13:30.575Z"
+    },
+    {
+      "id": "vch-002",
+      "code": "KIJANI-5542-TURBO",
+      "planId": "plan-3hr",
+      "amount": 50,
+      "isRedeemed": false,
+      "expiresAt": "2026-09-27T14:13:30.575Z",
+      "createdAt": "2026-08-28T14:13:30.575Z"
+    },
+    {
+      "id": "vch-003",
+      "code": "KIJANI-8812-ULTRA",
+      "planId": "plan-24hr",
+      "amount": 150,
+      "isRedeemed": false,
+      "expiresAt": "2026-09-27T14:13:30.575Z",
+      "createdAt": "2026-08-28T14:13:30.575Z"
+    }
+  ],
+  "systemConfigs": []
+}

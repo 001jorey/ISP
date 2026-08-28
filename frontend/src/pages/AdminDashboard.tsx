@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom'
+import React, { useState, useEffect } from 'react';
+import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Users, 
@@ -11,239 +11,246 @@ import {
   X,
   DollarSign,
   Activity,
-  Clock,
-  TrendingUp,
+  Ticket,
   Bell,
   Search,
-  RefreshCw
-} from 'lucide-react'
-import { useAuth } from '../hooks/useAuth'
-import { adminAPI } from '../services/api'
-import { formatCurrency } from '../utils/formatters'
-import toast from 'react-hot-toast'
-import type { DashboardStats } from '../types'
+  RefreshCw,
+  Sparkles,
+  Shield,
+  Gauge
+} from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
+import { adminAPI } from '../services/api';
+import { formatCurrency } from '../utils/formatters';
+import { FloatingBackground3D } from '../components/FloatingBackground3D';
+import { SpeedTestModal } from '../components/SpeedTestModal';
+import toast from 'react-hot-toast';
+import type { DashboardStats } from '../types';
 
 // Dashboard components
-import DashboardOverview from '../components/DashboardOverview'
-import UsersManagement from '../components/UsersManagement'
-import PlansManagement from '../components/PlansManagement'
-import SessionsManagement from '../components/SessionsManagement'
-import PaymentsManagement from '../components/PaymentsManagement'
-import SettingsPage from '../components/SettingsPage'
+import DashboardOverview from '../components/DashboardOverview';
+import UsersManagement from '../components/UsersManagement';
+import PlansManagement from '../components/PlansManagement';
+import SessionsManagement from '../components/SessionsManagement';
+import PaymentsManagement from '../components/PaymentsManagement';
+import SettingsPage from '../components/SettingsPage';
+import { VoucherBatchGenerator } from '../components/VoucherBatchGenerator';
 
-const AdminDashboard: React.FC = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [stats, setStats] = useState<DashboardStats | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const { user, logout } = useAuth()
-  const location = useLocation()
-  const navigate = useNavigate()
+export const AdminDashboard: React.FC = () => {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [speedTestOpen, setSpeedTestOpen] = useState(false);
+  const { user, logout } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    fetchDashboardStats()
-  }, [])
+    fetchDashboardStats();
+  }, []);
 
   const fetchDashboardStats = async (showRefreshing = false) => {
     try {
-      if (showRefreshing) setRefreshing(true)
-      const response = await adminAPI.getDashboardStats()
+      if (showRefreshing) setRefreshing(true);
+      const response = await adminAPI.getDashboardStats();
       if (response.success && response.data) {
-        setStats(response.data)
+        setStats(response.data);
       }
-    } catch (error) {
-      toast.error('Failed to load dashboard stats')
+    } catch {
+      toast.error('Failed to load dashboard stats');
     } finally {
-      setLoading(false)
-      if (showRefreshing) setRefreshing(false)
+      setLoading(false);
+      if (showRefreshing) setRefreshing(false);
     }
-  }
+  };
 
   const navigation = [
-    { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
-    { name: 'Users', href: '/admin/users', icon: Users },
-    { name: 'Plans', href: '/admin/plans', icon: CreditCard },
-    { name: 'Sessions', href: '/admin/sessions', icon: Wifi },
-    { name: 'Payments', href: '/admin/payments', icon: DollarSign },
-    { name: 'Settings', href: '/admin/settings', icon: Settings },
-  ]
+    { name: 'NOC Overview', href: '/admin', icon: LayoutDashboard },
+    { name: 'Subscribers', href: '/admin/users', icon: Users },
+    { name: 'Packages & Plans', href: '/admin/plans', icon: CreditCard },
+    { name: 'Active Sessions', href: '/admin/sessions', icon: Wifi },
+    { name: 'Voucher Studio', href: '/admin/vouchers', icon: Ticket },
+    { name: 'M-Pesa Ledger', href: '/admin/payments', icon: DollarSign },
+    { name: 'System Settings', href: '/admin/settings', icon: Settings },
+  ];
 
   const handleLogout = () => {
-    logout()
-    navigate('/admin/login')
-    toast.success('Logged out successfully')
-  }
-
-  const handleRefresh = () => {
-    fetchDashboardStats(true)
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="loading-spinner"></div>
-      </div>
-    )
-  }
+    logout();
+    navigate('/admin/login');
+    toast.success('Logged out successfully');
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Mobile sidebar backdrop */}
+    <div className="min-h-screen relative text-slate-100 flex flex-col lg:flex-row">
+      {/* 3D Background */}
+      <FloatingBackground3D />
+
+      {/* Mobile backdrop */}
       {sidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-64 lg:w-72 bg-white border-r border-gray-200 shadow-xl transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${
+      {/* Glass Sidebar */}
+      <aside className={`fixed inset-y-0 left-0 z-50 w-72 glass-panel border-r border-white/10 shadow-2xl transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static flex flex-col justify-between ${
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
-        <div className="flex items-center justify-between h-16 px-6 border-b border-gray-100">
-          <div className="flex items-center">
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center mr-3 shadow-lg">
-              <Wifi className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">COLLOSPOT</span>
-              <p className="text-xs text-gray-500 font-medium">Admin Portal</p>
-            </div>
-          </div>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="lg:hidden p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <nav className="mt-6 h-full flex flex-col">
-          <div className="px-6 mb-6">
-            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-4 border border-indigo-100">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center mr-3 shadow-md">
-                  <span className="text-white font-bold">{(user?.firstName || 'A')[0]}</span>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">Welcome back!</p>
-                  <p className="text-xs text-indigo-600 font-medium">{user?.firstName || 'Admin'}</p>
+        <div>
+          {/* Logo */}
+          <div className="flex items-center justify-between h-20 px-6 border-b border-white/10">
+            <Link to="/" className="flex items-center space-x-3 group">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-400 to-cyan-400 p-0.5 shadow-neon-emerald group-hover:scale-105 transition-all">
+                <div className="w-full h-full bg-slate-950/90 rounded-[14px] flex items-center justify-center">
+                  <Wifi className="w-5 h-5 text-emerald-400" />
                 </div>
               </div>
+              <div>
+                <span className="text-xl font-extrabold font-display bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-300 bg-clip-text text-transparent">
+                  KijaniLink
+                </span>
+                <p className="text-[10px] text-emerald-400 font-mono">NOC Admin v2.4</p>
+              </div>
+            </Link>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="lg:hidden p-2 text-slate-400 hover:text-white rounded-xl"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* User Profile Card */}
+          <div className="p-4 mx-4 my-4 rounded-2xl glass-panel-emerald border border-emerald-500/20 flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center text-white font-bold text-sm shadow-neon-emerald">
+              {(user?.firstName || 'A')[0].toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-bold text-white truncate">
+                {user?.firstName ? `${user.firstName} ${user.lastName || ''}` : 'Kijani Administrator'}
+              </div>
+              <div className="text-[10px] text-emerald-400 font-mono">admin@kijanilink.com</div>
             </div>
           </div>
 
-          <div className="flex-1 space-y-2 px-4">
+          {/* Navigation Links */}
+          <nav className="px-3 space-y-1.5">
             {navigation.map((item) => {
               const isActive = location.pathname === item.href || 
-                (item.href !== '/admin' && location.pathname.startsWith(item.href))
-              
+                (item.href !== '/admin' && location.pathname.startsWith(item.href));
+              const Icon = item.icon;
               return (
                 <Link
                   key={item.name}
                   to={item.href}
-                  className={`flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 group ${
-                    isActive
-                      ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-200'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
                   onClick={() => setSidebarOpen(false)}
+                  className={`flex items-center px-4 py-3 text-xs font-semibold rounded-2xl transition-all duration-200 group ${
+                    isActive
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-neon-emerald scale-[1.02]'
+                      : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                  }`}
                 >
-                  <item.icon className={`w-5 h-5 mr-3 ${
-                    isActive ? 'text-white' : 'text-gray-400 group-hover:text-indigo-500'
+                  <Icon className={`w-4 h-4 mr-3 transition-transform group-hover:scale-110 ${
+                    isActive ? 'text-white' : 'text-slate-400 group-hover:text-emerald-400'
                   }`} />
                   {item.name}
                 </Link>
-              )
+              );
             })}
-          </div>
-
-          <div className="p-4 border-t border-gray-100">
-            <button
-              onClick={handleLogout}
-              className="flex items-center w-full px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 rounded-xl transition-all duration-200 group"
-            >
-              <LogOut className="w-5 h-5 mr-3 transition-transform group-hover:scale-110" />
-              Sign Out
-            </button>
-          </div>
-        </nav>
-      </div>
-
-      {/* Main content */}
-      <div className="lg:pl-64 xl:pl-72">
-        {/* Top bar */}
-        <div className="bg-white/80 backdrop-blur-sm border-b border-gray-100">
-          <div className="flex items-center justify-between h-16 px-6">
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => setSidebarOpen(true)}
-                className="lg:hidden p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
-              >
-                <Menu className="w-5 h-5" />
-              </button>
-              
-              <div className="hidden md:flex items-center space-x-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input
-                    type="text"
-                    placeholder="Search anything..."
-                    className="pl-10 pr-4 py-2.5 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all w-64"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-3">
-              {stats && (
-                <div className="hidden lg:flex items-center space-x-4">
-                  <div className="flex items-center bg-gradient-to-r from-emerald-50 to-green-50 px-4 py-2 rounded-xl border border-emerald-100">
-                    <TrendingUp className="w-4 h-4 mr-2 text-emerald-600" />
-                    <span className="font-semibold text-emerald-700">{formatCurrency(stats.todayRevenue)}</span>
-                    <span className="text-emerald-500 ml-1 text-xs font-medium">today</span>
-                  </div>
-                  <div className="flex items-center bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-2 rounded-xl border border-blue-100">
-                    <Activity className="w-4 h-4 mr-2 text-blue-600" />
-                    <span className="font-semibold text-blue-700">{stats.activeSessions}</span>
-                    <span className="text-blue-500 ml-1 text-xs font-medium">active</span>
-                  </div>
-                </div>
-              )}
-              
-              <button
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="p-2.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors disabled:opacity-50"
-                title="Refresh data"
-              >
-                <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
-              </button>
-              
-              <button className="p-2.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors relative">
-                <Bell className="w-5 h-5" />
-                <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-gradient-to-r from-pink-500 to-red-500 rounded-full animate-pulse"></span>
-              </button>
-            </div>
-          </div>
+          </nav>
         </div>
 
-        {/* Page content */}
-        <main className="bg-gradient-to-br from-gray-50 via-white to-indigo-50/30 min-h-screen">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-            <Routes>
-              <Route path="/" element={<DashboardOverview stats={stats} onRefresh={handleRefresh} />} />
-              <Route path="/users" element={<UsersManagement />} />
-              <Route path="/plans" element={<PlansManagement />} />
-              <Route path="/sessions" element={<SessionsManagement />} />
-              <Route path="/payments" element={<PaymentsManagement />} />
-              <Route path="/settings" element={<SettingsPage />} />
-            </Routes>
+        {/* Sidebar Footer */}
+        <div className="p-4 border-t border-white/10 space-y-2">
+          <Link
+            to="/"
+            className="flex items-center w-full px-4 py-2.5 text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition-all"
+          >
+            <Wifi className="w-4 h-4 mr-3 text-emerald-400" />
+            <span>Open Customer Portal</span>
+          </Link>
+          <button
+            onClick={handleLogout}
+            className="flex items-center w-full px-4 py-2.5 text-xs font-semibold text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-all"
+          >
+            <LogOut className="w-4 h-4 mr-3" />
+            <span>Sign Out</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 z-10">
+        
+        {/* Top Navbar */}
+        <header className="sticky top-0 z-30 glass-panel border-b border-white/10 px-4 sm:px-8 py-3.5 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden p-2 text-slate-400 hover:text-white rounded-xl"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div className="hidden sm:flex items-center space-x-2 text-xs text-slate-400 font-medium">
+              <span className="text-white font-bold">NOC Dashboard</span>
+              <span>/</span>
+              <span className="text-emerald-400 capitalize">{location.pathname.replace('/admin/', '').replace('/admin', 'Overview')}</span>
+            </div>
           </div>
+
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            {stats && (
+              <div className="hidden md:flex items-center space-x-2 text-xs">
+                <div className="glass-pill px-3 py-1.5 rounded-xl text-emerald-300 font-mono flex items-center">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 mr-1.5 animate-pulse" />
+                  Today: {formatCurrency(stats.todayRevenue)}
+                </div>
+                <div className="glass-pill px-3 py-1.5 rounded-xl text-cyan-300 font-mono flex items-center">
+                  <Activity className="w-3.5 h-3.5 mr-1 text-cyan-400" />
+                  {stats.activeSessions} Active
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={() => setSpeedTestOpen(true)}
+              className="glass-pill p-2 sm:px-3 sm:py-1.5 rounded-xl text-xs text-slate-200 hover:text-white flex items-center space-x-1.5"
+              title="Speed Test"
+            >
+              <Gauge className="w-4 h-4 text-cyan-400" />
+              <span className="hidden sm:inline">Speed Test</span>
+            </button>
+
+            <button
+              onClick={() => fetchDashboardStats(true)}
+              disabled={refreshing}
+              className="glass-pill p-2 rounded-xl text-slate-300 hover:text-white disabled:opacity-50"
+              title="Refresh NOC"
+            >
+              <RefreshCw className={`w-4 h-4 text-emerald-400 ${refreshing ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+        </header>
+
+        {/* Page Content View */}
+        <main className="flex-1 p-4 sm:p-8 max-w-7xl w-full mx-auto">
+          <Routes>
+            <Route path="/" element={<DashboardOverview stats={stats} onRefresh={() => fetchDashboardStats(true)} />} />
+            <Route path="/users" element={<UsersManagement />} />
+            <Route path="/plans" element={<PlansManagement />} />
+            <Route path="/sessions" element={<SessionsManagement />} />
+            <Route path="/vouchers" element={<VoucherBatchGenerator />} />
+            <Route path="/payments" element={<PaymentsManagement />} />
+            <Route path="/settings" element={<SettingsPage />} />
+          </Routes>
         </main>
       </div>
-    </div>
-  )
-}
 
-export default AdminDashboard
+      <SpeedTestModal isOpen={speedTestOpen} onClose={() => setSpeedTestOpen(false)} />
+    </div>
+  );
+};
+
+export default AdminDashboard;
