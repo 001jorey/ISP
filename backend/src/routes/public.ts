@@ -3,9 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { body, validationResult } from 'express-validator';
-import mpesaService from '../services/mpesaService';
 import sessionService from '../services/sessionService';
-import smsService from '../services/smsService';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -78,9 +76,6 @@ router.post('/register', [
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' } as jwt.SignOptions
     );
 
-    // Send welcome SMS
-    await smsService.sendWelcomeMessage(phone, firstName);
-
     res.status(201).json({
       success: true,
       data: {
@@ -149,133 +144,6 @@ router.post('/login', [
   }
 });
 
-// Initiate payment
-router.post('/payment', [
-  body('phone').isMobilePhone('any').withMessage('Valid phone number required'),
-  body('planId').isUUID().withMessage('Valid plan ID required'),
-  body('amount').isFloat({ min: 1 }).withMessage('Valid amount required')
-], async (req: Request, res: Response) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ success: false, errors: errors.array() });
-    }
-
-    const { phone, planId, amount } = req.body;
-
-    // Get or create user
-    let user = await prisma.user.findUnique({
-      where: { phone }
-    });
-
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          phone,
-          role: 'CUSTOMER'
-        }
-      });
-    }
-
-    // Verify plan exists
-    const plan = await prisma.plan.findUnique({
-      where: { id: planId }
-    });
-
-    if (!plan || !plan.isActive) {
-      return res.status(404).json({ success: false, error: 'Plan not found or inactive' });
-    }
-
-    // Create payment record
-    const payment = await prisma.payment.create({
-      data: {
-        userId: user.id,
-        planId,
-        amount,
-        status: 'PENDING'
-      }
-    });
-
-    // Initiate M-Pesa STK Push
-    const stkResponse = await mpesaService.initiateSTKPush({
-      phone,
-      amount,
-      accountReference: `COLLOSPOT-${payment.id}`,
-      transactionDesc: `Payment for ${plan.name}`
-    });
-
-    // Update payment with checkout request ID
-    await prisma.payment.update({
-      where: { id: payment.id },
-      data: {
-        checkoutRequestId: stkResponse.CheckoutRequestID
-      }
-    });
-
-    res.json({
-      success: true,
-      data: {
-        checkoutRequestId: stkResponse.CheckoutRequestID,
-        customerMessage: stkResponse.CustomerMessage
-      }
-    });
-  } catch (error) {
-    console.error('Payment initiation error:', error);
-    res.status(500).json({ success: false, error: 'Payment initiation failed' });
-  }
-});
-
-// Check payment status
-router.get('/payment/status/:checkoutRequestId', async (req: Request, res: Response) => {
-  try {
-    const { checkoutRequestId } = req.params;
-
-    const payment = await prisma.payment.findUnique({
-      where: { checkoutRequestId },
-      include: { user: true, plan: true }
-    });
-
-    if (!payment) {
-      return res.status(404).json({ success: false, error: 'Payment not found' });
-    }
-
-    // If payment is completed, create session
-    if (payment.status === 'COMPLETED') {
-      const existingSession = await prisma.session.findFirst({
-        where: {
-          userId: payment.userId,
-          planId: payment.planId,
-          status: 'ACTIVE'
-        }
-      });
-
-      if (!existingSession) {
-        const sessionToken = generateSessionToken();
-        await sessionService.createSession(payment.userId, payment.planId, sessionToken);
-        
-        return res.json({
-          success: true,
-          data: {
-            status: 'completed',
-            sessionToken
-          }
-        });
-      }
-    }
-
-    res.json({
-      success: true,
-      data: {
-        status: payment.status.toLowerCase(),
-        amount: payment.amount
-      }
-    });
-  } catch (error) {
-    console.error('Payment status check error:', error);
-    res.status(500).json({ success: false, error: 'Failed to check payment status' });
-  }
-});
-
 // Connect to internet
 router.post('/connect', [
   body('sessionToken').notEmpty().withMessage('Session token required')
@@ -305,21 +173,5 @@ router.post('/connect', [
     res.status(500).json({ success: false, error: 'Connection failed' });
   }
 });
-
-// M-Pesa callback
-router.post('/payment/mpesa/callback', async (req: Request, res: Response) => {
-  try {
-    await mpesaService.handleCallback(req.body);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Callback error:', error);
-    res.status(500).json({ success: false });
-  }
-});
-
-// Helper function
-function generateSessionToken(): string {
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-}
 
 export default router;

@@ -69,26 +69,28 @@ export interface ApiResponse<T> {
   errors?: Array<{ msg: string; param: string }>
 }
 
-export interface PaginatedResponse<T> {
-  data: T[]
-  pagination: {
-    page: number
-    limit: number
-    total: number
-    pages: number
-  }
+export interface Pagination {
+  page: number
+  limit: number
+  total: number
+  pages: number
 }
 
-export interface PaymentRequest {
-  phone: string
-  planId: string
-  amount: number
+// Matches the backend admin list endpoints, which return
+// { users | sessions | payments, pagination } inside `data`.
+export interface PaginatedUsersResponse {
+  users: User[]
+  pagination: Pagination
 }
 
-export interface PaymentStatusResponse {
-  status: 'pending' | 'completed' | 'failed' | 'timeout'
-  sessionToken?: string
-  amount?: number
+export interface PaginatedSessionsResponse {
+  sessions: Session[]
+  pagination: Pagination
+}
+
+export interface PaginatedPaymentsResponse {
+  payments: Payment[]
+  pagination: Pagination
 }
 
 export interface ConnectionRequest {

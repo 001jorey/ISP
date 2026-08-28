@@ -1,7 +1,8 @@
+import './env';
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
 import cron from 'node-cron';
 
@@ -14,8 +15,6 @@ import publicRoutes from './routes/public';
 
 import { errorHandler } from './middleware/errorHandler';
 import { sessionCleanup } from './services/sessionService';
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;

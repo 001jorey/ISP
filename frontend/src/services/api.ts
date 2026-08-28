@@ -2,14 +2,14 @@ import axios from 'axios'
 import type { 
   ApiResponse, 
   Plan, 
-  PaymentRequest, 
-  PaymentStatusResponse, 
   ConnectionRequest,
   User,
   DashboardStats,
   Session,
   Payment,
-  PaginatedResponse
+  PaginatedUsersResponse,
+  PaginatedSessionsResponse,
+  PaginatedPaymentsResponse
 } from '../types'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
@@ -65,13 +65,6 @@ export const publicAPI = {
   login: (data: { phone: string }): Promise<ApiResponse<{ user: User; token: string }>> =>
     publicApi.post('/public/login', data).then(res => res.data),
 
-  // Payments
-  makePayment: (data: PaymentRequest): Promise<ApiResponse<{ checkoutRequestId: string; customerMessage: string }>> =>
-    publicApi.post('/public/payment', data).then(res => res.data),
-
-  getPaymentStatus: (checkoutRequestId: string): Promise<ApiResponse<PaymentStatusResponse>> =>
-    publicApi.get(`/public/payment/status/${checkoutRequestId}`).then(res => res.data),
-
   // Connection
   connect: (data: ConnectionRequest): Promise<ApiResponse<{ message: string; session: any }>> =>
     publicApi.post('/public/connect', data).then(res => res.data),
@@ -98,7 +91,7 @@ export const adminAPI = {
     page?: number
     limit?: number
     search?: string
-  }): Promise<ApiResponse<PaginatedResponse<User>>> =>
+  }): Promise<ApiResponse<PaginatedUsersResponse>> =>
     privateApi.get('/admin/users', { params }).then(res => res.data),
 
   // Plans
@@ -119,7 +112,7 @@ export const adminAPI = {
     page?: number
     limit?: number
     status?: string
-  }): Promise<ApiResponse<PaginatedResponse<Session>>> =>
+  }): Promise<ApiResponse<PaginatedSessionsResponse>> =>
     privateApi.get('/admin/sessions', { params }).then(res => res.data),
 
   terminateSession: (id: string): Promise<ApiResponse<{ message: string }>> =>
@@ -130,7 +123,7 @@ export const adminAPI = {
     page?: number
     limit?: number
     status?: string
-  }): Promise<ApiResponse<PaginatedResponse<Payment>>> =>
+  }): Promise<ApiResponse<PaginatedPaymentsResponse>> =>
     privateApi.get('/admin/payments', { params }).then(res => res.data),
 
   // Router

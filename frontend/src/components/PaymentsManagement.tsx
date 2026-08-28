@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import { DollarSign, Search, Filter, Download, Calendar, CreditCard } from 'lucide-react'
+import { DollarSign, Download, Calendar, CreditCard } from 'lucide-react'
 import { adminAPI } from '../services/api'
 import { formatCurrency } from '../utils/formatters'
 import toast from 'react-hot-toast'
-import type { Payment, PaginatedResponse } from '../types'
+import type { Payment } from '../types'
 
 const PaymentsManagement: React.FC = () => {
   const [payments, setPayments] = useState<Payment[]>([])

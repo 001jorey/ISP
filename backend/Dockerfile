@@ -1,33 +1,41 @@
-# Use Node.js 18 Alpine image
-FROM node:18-alpine
+# ── Build stage ──────────────────────────────────────────────
+FROM node:18-alpine AS build
 
-# Set working directory
 WORKDIR /app
 
-# Copy package files
+# Install ALL dependencies (dev deps needed for prisma CLI + tsc)
 COPY package*.json ./
+RUN npm ci
 
-# Install dependencies
-RUN npm ci --only=production
-
-# Copy source code
-COPY . .
-
-# Generate Prisma client
+# Generate Prisma client, then build TypeScript
+COPY prisma ./prisma
 RUN npx prisma generate
-
-# Build TypeScript
+COPY . .
 RUN npm run build
 
-# Create logs directory
+# ── Production stage ─────────────────────────────────────────
+FROM node:18-alpine
+
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY package*.json ./
+RUN npm ci --only=production
+
+# Prisma schema + generated client (includes the query engine)
+COPY prisma ./prisma
+COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
+
+# Compiled app
+COPY --from=build /app/dist ./dist
+
 RUN mkdir -p logs
 
-# Expose port
 EXPOSE 5000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:5000/health || exit 1
+# Alpine ships wget, not curl
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD wget -qO- http://localhost:5000/health || exit 1
 
-# Start the application
-CMD ["npm", "start"]
+CMD ["node", "dist/server.js"]

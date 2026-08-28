@@ -1,22 +1,17 @@
 version: '3.8'
 
-services:
-  # PostgreSQL Database
-  postgres:
-    image: postgres:15-alpine
-    container_name: collospot-db
-    environment:
-      POSTGRES_DB: collospot_db
-      POSTGRES_USER: collospot
-      POSTGRES_PASSWORD: collospot123
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    networks:
-      - collospot-network
-    restart: unless-stopped
+# COLLOSPOT local Docker setup
+#
+# NOTE: the app currently stores data in SQLite (backend/prisma/dev.db,
+# configured in backend/prisma/schema.prisma). The database file lives in a
+# named volume so it survives container rebuilds.
+#
+# Usage:
+#   docker compose up -d --build
+#   docker compose exec backend npm run db:push   # create tables
+#   docker compose exec backend npm run db:seed   # admin user + plans
 
+services:
   # Backend API
   backend:
     build:
@@ -24,41 +19,31 @@ services:
       dockerfile: Dockerfile
     container_name: collospot-backend
     environment:
-      DATABASE_URL: "postgresql://collospot:collospot123@postgres:5432/collospot_db"
-      JWT_SECRET: "your-super-secret-jwt-key-change-in-production"
+      JWT_SECRET: "change-me-to-a-long-random-string"
       NODE_ENV: "production"
       PORT: 5000
-      # Add your M-Pesa and other API credentials here
-      MPESA_CONSUMER_KEY: "your-mpesa-consumer-key"
-      MPESA_CONSUMER_SECRET: "your-mpesa-consumer-secret"
-      MPESA_SHORTCODE: "174379"
-      MPESA_PASSKEY: "your-mpesa-passkey"
-      MPESA_CALLBACK_URL: "https://yourdomain.com/api/public/payment/mpesa/callback"
-      MPESA_ENVIRONMENT: "sandbox"
+      # MikroTik router — use the router's LAN IP reachable from Docker
       MIKROTIK_HOST: "192.168.1.1"
       MIKROTIK_USERNAME: "admin"
       MIKROTIK_PASSWORD: "your-router-password"
-      AFRICASTALKING_USERNAME: "sandbox"
-      AFRICASTALKING_API_KEY: "your-africastalking-api-key"
+      MIKROTIK_PORT: "8728"
       FRONTEND_URL: "http://localhost:3000"
     ports:
       - "5000:5000"
-    depends_on:
-      - postgres
+    volumes:
+      # Persist the SQLite database (schema file + dev.db)
+      - collospot-db:/app/prisma
+      - ./backend/logs:/app/logs
     networks:
       - collospot-network
     restart: unless-stopped
-    volumes:
-      - ./backend/logs:/app/logs
 
-  # Frontend (React)
+  # Frontend (React, served by nginx; /api is proxied to the backend)
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: collospot-frontend
-    environment:
-      VITE_API_URL: "http://localhost:5000/api"
     ports:
       - "3000:80"
     depends_on:
@@ -67,25 +52,32 @@ services:
       - collospot-network
     restart: unless-stopped
 
-  # Nginx Reverse Proxy (Optional)
-  nginx:
-    image: nginx:alpine
-    container_name: collospot-nginx
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf
-      - ./ssl:/etc/nginx/ssl
-    depends_on:
-      - frontend
-      - backend
-    networks:
-      - collospot-network
-    restart: unless-stopped
+  # PostgreSQL is NOT used by the app at the moment (schema is SQLite).
+  # If you switch backend/prisma/schema.prisma to the postgres provider and
+  # set `url = env("DATABASE_URL")`, uncomment this block and point
+  # DATABASE_URL in the backend service at it.
+  #
+  # postgres:
+  #   image: postgres:15-alpine
+  #   container_name: collospot-db
+  #   environment:
+  #     POSTGRES_DB: collospot_db
+  #     POSTGRES_USER: collospot
+  #     POSTGRES_PASSWORD: collospot123
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+  #   networks:
+  #     - collospot-network
+  #   restart: unless-stopped
+  #
+  # And add to the backend service:
+  #   DATABASE_URL: "postgresql://collospot:collospot123@postgres:5432/collospot_db"
 
 volumes:
-  postgres_data:
+  collospot-db:
+  # postgres_data:
 
 networks:
   collospot-network:

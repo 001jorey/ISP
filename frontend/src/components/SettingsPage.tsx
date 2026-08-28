@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Settings, Wifi, DollarSign, Bell, Shield, Database, Save } from 'lucide-react'
+import { Settings, Wifi, Bell, Shield, Database, Save } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const SettingsPage: React.FC = () => {
@@ -12,13 +12,6 @@ const SettingsPage: React.FC = () => {
       supportPhone: '+254700000000',
       timezone: 'Africa/Nairobi'
     },
-    mpesa: {
-      consumerKey: '',
-      consumerSecret: '',
-      shortcode: '174379',
-      passkey: '',
-      environment: 'sandbox'
-    },
     router: {
       host: '192.168.1.1',
       username: 'admin',
@@ -27,7 +20,6 @@ const SettingsPage: React.FC = () => {
     },
     notifications: {
       emailNotifications: true,
-      smsNotifications: true,
       paymentAlerts: true,
       sessionAlerts: false
     }
@@ -35,7 +27,6 @@ const SettingsPage: React.FC = () => {
 
   const tabs = [
     { id: 'general', name: 'General', icon: Settings },
-    { id: 'mpesa', name: 'M-Pesa', icon: DollarSign },
     { id: 'router', name: 'Router', icon: Wifi },
     { id: 'notifications', name: 'Notifications', icon: Bell },
     { id: 'security', name: 'Security', icon: Shield },
@@ -104,77 +95,6 @@ const SettingsPage: React.FC = () => {
       >
         <Save className="w-4 h-4 mr-2" />
         Save Changes
-      </button>
-    </div>
-  )
-
-  const renderMpesaSettings = () => (
-    <div className="space-y-6">
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <p className="text-sm text-yellow-800">
-          <strong>Warning:</strong> These are sensitive credentials. Make sure to keep them secure.
-        </p>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Consumer Key</label>
-          <input
-            type="password"
-            value={settings.mpesa.consumerKey}
-            onChange={(e) => setSettings({
-              ...settings,
-              mpesa: { ...settings.mpesa, consumerKey: e.target.value }
-            })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Enter M-Pesa consumer key"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Consumer Secret</label>
-          <input
-            type="password"
-            value={settings.mpesa.consumerSecret}
-            onChange={(e) => setSettings({
-              ...settings,
-              mpesa: { ...settings.mpesa, consumerSecret: e.target.value }
-            })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Enter M-Pesa consumer secret"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Shortcode</label>
-          <input
-            type="text"
-            value={settings.mpesa.shortcode}
-            onChange={(e) => setSettings({
-              ...settings,
-              mpesa: { ...settings.mpesa, shortcode: e.target.value }
-            })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Environment</label>
-          <select
-            value={settings.mpesa.environment}
-            onChange={(e) => setSettings({
-              ...settings,
-              mpesa: { ...settings.mpesa, environment: e.target.value }
-            })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="sandbox">Sandbox</option>
-            <option value="production">Production</option>
-          </select>
-        </div>
-      </div>
-      <button
-        onClick={() => handleSave('M-Pesa')}
-        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center"
-      >
-        <Save className="w-4 h-4 mr-2" />
-        Save M-Pesa Settings
       </button>
     </div>
   )
@@ -271,24 +191,6 @@ const SettingsPage: React.FC = () => {
           </label>
         </div>
         
-        <div className="flex items-center justify-between">
-          <div>
-            <h4 className="text-sm font-medium text-gray-900">SMS Notifications</h4>
-            <p className="text-sm text-gray-500">Send SMS alerts to customers</p>
-          </div>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={settings.notifications.smsNotifications}
-              onChange={(e) => setSettings({
-                ...settings,
-                notifications: { ...settings.notifications, smsNotifications: e.target.checked }
-              })}
-              className="sr-only peer"
-            />
-            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-          </label>
-        </div>
       </div>
       
       <button
@@ -332,7 +234,6 @@ const SettingsPage: React.FC = () => {
 
         <div className="p-6">
           {activeTab === 'general' && renderGeneralSettings()}
-          {activeTab === 'mpesa' && renderMpesaSettings()}
           {activeTab === 'router' && renderRouterSettings()}
           {activeTab === 'notifications' && renderNotificationSettings()}
           {activeTab === 'security' && (
