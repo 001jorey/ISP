@@ -1,13 +1,12 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import { db } from '../database/db';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // Get all active plans (public)
 router.get('/', async (req, res) => {
   try {
-    const plans = await prisma.plan.findMany({
+    const plans = await db.plan.findMany({
       where: { isActive: true },
       orderBy: { price: 'asc' }
     });
@@ -23,7 +22,7 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    const plan = await prisma.plan.findUnique({
+    const plan = await db.plan.findUnique({
       where: { id, isActive: true }
     });
     

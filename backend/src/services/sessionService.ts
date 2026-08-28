@@ -1,13 +1,11 @@
-import { PrismaClient } from '@prisma/client';
+import { db } from '../database/db';
 import mikrotikService from './mikrotikService';
 import smsService from './smsService';
-
-const prisma = new PrismaClient();
 
 export class SessionService {
   async createSession(userId: string, planId: string, sessionToken: string): Promise<any> {
     try {
-      const plan = await prisma.plan.findUnique({
+      const plan = await db.plan.findUnique({
         where: { id: planId }
       });
 
@@ -18,7 +16,7 @@ export class SessionService {
       const endTime = new Date();
       endTime.setHours(endTime.getHours() + plan.duration);
 
-      const session = await prisma.session.create({
+      const session = await db.session.create({
         data: {
           userId,
           planId,
@@ -32,7 +30,6 @@ export class SessionService {
         }
       });
 
-      // Create MikroTik user profile based on plan
       const profileName = `plan_${plan.id}`;
       const speedLimit = this.parseSpeedLimit(plan.speedLimit);
       const sessionTimeout = mikrotikService.formatSessionTimeout(plan.duration);
@@ -44,10 +41,9 @@ export class SessionService {
           sessionTimeout
         );
       } catch (error) {
-        console.log('Profile might already exist, continuing...');
+        // Continue
       }
 
-      // Create hotspot user
       await mikrotikService.createHotspotUser(
         sessionToken,
         sessionToken,
@@ -63,7 +59,7 @@ export class SessionService {
 
   async terminateSession(sessionId: string): Promise<void> {
     try {
-      const session = await prisma.session.findUnique({
+      const session = await db.session.findUnique({
         where: { id: sessionId },
         include: { user: true }
       });
@@ -72,18 +68,15 @@ export class SessionService {
         throw new Error('Session not found');
       }
 
-      // Update session status
-      await prisma.session.update({
+      await db.session.update({
         where: { id: sessionId },
         data: {
           status: 'TERMINATED',
-          endTime: new Date()
+          endTime: new Date().toISOString()
         }
       });
 
-      // Remove from MikroTik
       await mikrotikService.removeHotspotUser(session.sessionToken);
-
       console.log(`✅ Session terminated: ${sessionId}`);
     } catch (error) {
       console.error('Error terminating session:', error);
@@ -93,7 +86,7 @@ export class SessionService {
 
   async getActiveSession(sessionToken: string): Promise<any> {
     try {
-      const session = await prisma.session.findUnique({
+      const session = await db.session.findUnique({
         where: { sessionToken },
         include: {
           user: true,
@@ -105,8 +98,7 @@ export class SessionService {
         return null;
       }
 
-      // Check if session has expired
-      if (session.endTime && new Date() > session.endTime) {
+      if (session.endTime && new Date() > new Date(session.endTime)) {
         await this.terminateSession(session.id);
         return null;
       }
@@ -120,13 +112,10 @@ export class SessionService {
 
   async getUserActiveSessions(userId: string): Promise<any[]> {
     try {
-      return await prisma.session.findMany({
+      return await db.session.findMany({
         where: {
           userId,
-          status: 'ACTIVE',
-          endTime: {
-            gt: new Date()
-          }
+          status: 'ACTIVE'
         },
         include: {
           plan: true
@@ -143,7 +132,7 @@ export class SessionService {
 
   async updateSessionUsage(sessionToken: string, dataUsed: number): Promise<void> {
     try {
-      await prisma.session.update({
+      await db.session.update({
         where: { sessionToken },
         data: { dataUsed }
       });
@@ -153,21 +142,19 @@ export class SessionService {
   }
 
   private parseSpeedLimit(speedLimit: string): string {
-    // Convert "10Mbps" to "10M/10M" format for MikroTik
     const speed = speedLimit.replace(/[^\d]/g, '');
     const unit = speedLimit.includes('Gbps') ? 'G' : 'M';
-    return `${speed}${unit}/${speed}${unit}`;
+    return `${speed || '10'}${unit}/${speed || '10'}${unit}`;
   }
 }
 
-// Cleanup expired sessions
 export const sessionCleanup = async (): Promise<void> => {
   try {
-    const expiredSessions = await prisma.session.findMany({
+    const expiredSessions = await db.session.findMany({
       where: {
         status: 'ACTIVE',
         endTime: {
-          lt: new Date()
+          lt: new Date().toISOString()
         }
       }
     });
@@ -175,21 +162,16 @@ export const sessionCleanup = async (): Promise<void> => {
     for (const session of expiredSessions) {
       await new SessionService().terminateSession(session.id);
       
-      // Send expiry notification
-      const user = await prisma.user.findUnique({
+      const user = await db.user.findUnique({
         where: { id: session.userId }
       });
 
       if (user) {
         await smsService.sendSMS(
           user.phone,
-          'Your internet session has expired. Purchase a new plan to continue browsing. - COLLOSPOT'
+          'Your KijaniLink internet session has expired. Purchase a new plan to continue high-speed browsing. - KijaniLink'
         );
       }
-    }
-
-    if (expiredSessions.length > 0) {
-      console.log(`🧹 Cleaned up ${expiredSessions.length} expired sessions`);
     }
   } catch (error) {
     console.error('Error during session cleanup:', error);
