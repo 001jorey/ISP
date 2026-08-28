@@ -3,18 +3,14 @@ import {
   Users, 
   DollarSign, 
   Wifi, 
-  TrendingUp, 
   Activity, 
-  Clock, 
   ArrowUpRight, 
   Zap, 
-  Server, 
-  Radio, 
   Ticket,
-  Terminal,
   ShieldCheck,
   RefreshCw,
-  Gauge
+  Gauge,
+  UserCheck
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { formatCurrency } from '../utils/formatters';
@@ -30,48 +26,51 @@ interface DashboardOverviewProps {
 }
 
 const chartData = [
-  { time: '06:00', revenue: 3200, traffic: 42 },
-  { time: '08:00', revenue: 6800, traffic: 95 },
-  { time: '10:00', revenue: 11400, traffic: 140 },
-  { time: '12:00', revenue: 16200, traffic: 185 },
-  { time: '14:00', revenue: 19800, traffic: 160 },
-  { time: '16:00', revenue: 25400, traffic: 210 },
-  { time: '18:00', revenue: 32500, traffic: 280 },
-  { time: '20:00', revenue: 38900, traffic: 310 },
-  { time: '22:00', revenue: 42100, traffic: 240 },
+  { time: '06:00', activations: 12, traffic: 42 },
+  { time: '08:00', activations: 28, traffic: 95 },
+  { time: '10:00', activations: 45, traffic: 140 },
+  { time: '12:00', activations: 62, traffic: 185 },
+  { time: '14:00', activations: 80, traffic: 160 },
+  { time: '16:00', activations: 104, traffic: 210 },
+  { time: '18:00', activations: 135, traffic: 280 },
+  { time: '20:00', activations: 158, traffic: 310 },
+  { time: '22:00', activations: 180, traffic: 240 },
 ];
 
 export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ stats, onRefresh }) => {
   const navigate = useNavigate();
   const [speedTestOpen, setSpeedTestOpen] = useState(false);
 
+  const pendingCount = stats?.pendingActivations || 2;
+
   const kpis = [
     {
-      title: 'Total Subscribers',
+      title: 'Pending Client Approvals',
+      value: pendingCount.toString(),
+      sub: '10-Min Grace Active',
+      icon: UserCheck,
+      color: 'from-amber-500 to-orange-600',
+      glow: 'shadow-md',
+      change: 'Action Required',
+      onClick: () => navigate('/admin/new-clients')
+    },
+    {
+      title: 'Total Active Subscribers',
       value: stats ? stats.totalUsers.toLocaleString() : '842',
-      sub: `${stats ? stats.activeUsers : '628'} Active customers`,
+      sub: `${stats ? stats.activeUsers : '628'} approved accounts`,
       icon: Users,
       color: 'from-emerald-500 to-teal-600',
       glow: 'shadow-neon-emerald',
       change: '+14.2% this month'
     },
     {
-      title: 'Total Revenue (M-Pesa)',
-      value: formatCurrency(stats ? stats.totalRevenue : 248500),
-      sub: `Today: ${formatCurrency(stats ? stats.todayRevenue : 18450)}`,
-      icon: DollarSign,
+      title: 'Live Hotspot & PPPoE Leases',
+      value: (stats ? stats.activeSessions : 38).toString(),
+      sub: 'MikroTik CCR2004 Cluster',
+      icon: Wifi,
       color: 'from-cyan-500 to-blue-600',
       glow: 'shadow-neon-cyan',
-      change: '+18.6% vs yesterday'
-    },
-    {
-      title: 'Live Hotspot Sessions',
-      value: (stats ? stats.activeSessions : 38).toString(),
-      sub: 'MikroTik CCR2004 cluster',
-      icon: Wifi,
-      color: 'from-emerald-400 to-green-600',
-      glow: 'shadow-neon-emerald',
-      change: 'Zero packet drop'
+      change: 'Zero packet loss'
     },
     {
       title: 'Network Throughput',
@@ -80,29 +79,39 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ stats, onR
       icon: Activity,
       color: 'from-indigo-500 to-purple-600',
       glow: 'shadow-neon-purple',
-      change: '24% CPU • 41°C stable'
+      change: '18% CPU • 41°C stable'
     }
   ];
 
   return (
     <div className="space-y-8">
       
-      {/* Top Banner with Realtime Status */}
+      {/* Top Banner */}
       <div className="glass-panel-emerald rounded-3xl p-6 sm:p-8 border border-emerald-500/20 shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="relative z-10">
           <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold mb-2 border border-emerald-500/30">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-            <span>KijaniLink ISP Core Gateway Online</span>
+            <span>KijaniLink ISP Core NOC Online</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold font-display text-white">
             Network Operations Center (NOC)
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-xl">
-            Real-time monitoring of Daraja M-Pesa STK push transactions, MikroTik captive portal sessions, and bandwidth allocation.
+            Admin activation workflow: Clients receive 10-minute temporary grace access upon request until you approve their full package.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 relative z-10">
+          {pendingCount > 0 && (
+            <button
+              onClick={() => navigate('/admin/new-clients')}
+              className="px-4 py-2.5 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 hover:bg-amber-400 flex items-center space-x-2 shadow-lg transition-all"
+            >
+              <UserCheck className="w-4 h-4" />
+              <span>Review {pendingCount} Pending Clients</span>
+            </button>
+          )}
+
           <button
             onClick={() => setSpeedTestOpen(true)}
             className="btn-glass px-4 py-2.5 rounded-xl text-xs font-semibold text-white flex items-center space-x-2"
@@ -125,7 +134,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ stats, onR
         {kpis.map((kpi, idx) => (
           <div
             key={idx}
-            className="glass-panel-card rounded-3xl p-6 border border-white/10 hover:border-emerald-500/40 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300"
+            onClick={kpi.onClick}
+            className={`glass-panel-card rounded-3xl p-6 border border-white/10 hover:border-emerald-500/40 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300 ${kpi.onClick ? 'cursor-pointer' : ''}`}
           >
             <div className="flex items-center justify-between mb-4">
               <div className={`w-12 h-12 rounded-2xl bg-gradient-to-tr ${kpi.color} flex items-center justify-center text-white ${kpi.glow} group-hover:rotate-6 transition-transform`}>
@@ -152,16 +162,16 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ stats, onR
       {/* Main Charts & Live Traffic Analytics */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Revenue & Bandwidth Graph */}
+        {/* Daily Activations & Bandwidth Graph */}
         <div className="lg:col-span-2 glass-panel-card rounded-3xl p-6 border border-white/10 shadow-xl relative">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="text-lg font-bold font-display text-white">Daily Revenue & Bandwidth Curve</h3>
-              <p className="text-xs text-slate-400">M-Pesa STK checkout completions & aggregated aggregate Mbps throughput</p>
+              <h3 className="text-lg font-bold font-display text-white">Daily Activations & Bandwidth Load</h3>
+              <p className="text-xs text-slate-400">Customer activation requests approved & aggregate Mbps throughput</p>
             </div>
             <div className="flex items-center space-x-3 text-xs">
               <span className="flex items-center text-emerald-400">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 mr-1.5" /> Revenue (KES)
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 mr-1.5" /> Approved Clients
               </span>
               <span className="flex items-center text-cyan-400">
                 <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 mr-1.5" /> Traffic (Mbps)
@@ -195,7 +205,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ stats, onR
                     boxShadow: '0 20px 40px rgba(0,0,0,0.5)'
                   }}
                 />
-                <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" />
+                <Area type="monotone" dataKey="activations" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" />
                 <Area type="monotone" dataKey="traffic" stroke="#06b6d4" strokeWidth={2} strokeDasharray="3 3" fillOpacity={1} fill="url(#colorTraf)" />
               </AreaChart>
             </ResponsiveContainer>
@@ -209,6 +219,24 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ stats, onR
             
             <div className="space-y-3">
               <button
+                onClick={() => navigate('/admin/new-clients')}
+                className="w-full p-3.5 rounded-2xl glass-panel border border-amber-500/30 hover:border-amber-400 bg-amber-950/10 text-left flex items-center justify-between group transition-all"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                    <UserCheck className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-white group-hover:text-amber-300 transition-colors">
+                      Client Approvals ({pendingCount})
+                    </div>
+                    <div className="text-[10px] text-slate-400">Approve 10-min grace requests</div>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-amber-300 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+
+              <button
                 onClick={() => navigate('/admin/plans')}
                 className="w-full p-3.5 rounded-2xl glass-panel border border-white/5 hover:border-emerald-500/40 text-left flex items-center justify-between group transition-all"
               >
@@ -217,7 +245,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ stats, onR
                     <Zap className="w-4 h-4" />
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-white group-hover:text-emerald-400 transition-colors">Manage Plans & Pricing</div>
+                    <div className="text-xs font-bold text-white group-hover:text-emerald-400 transition-colors">Manage Packages & Speeds</div>
                     <div className="text-[10px] text-slate-400">Configure speed tiers & durations</div>
                   </div>
                 </div>
@@ -238,22 +266,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ stats, onR
                   </div>
                 </div>
                 <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-cyan-400 group-hover:translate-x-0.5 transition-transform" />
-              </button>
-
-              <button
-                onClick={() => navigate('/admin/sessions')}
-                className="w-full p-3.5 rounded-2xl glass-panel border border-white/5 hover:border-purple-500/40 text-left flex items-center justify-between group transition-all"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="w-9 h-9 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
-                    <Wifi className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-white group-hover:text-purple-400 transition-colors">Live Active Sessions</div>
-                    <div className="text-[10px] text-slate-400">Inspect & kick active MACs</div>
-                  </div>
-                </div>
-                <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-purple-400 group-hover:translate-x-0.5 transition-transform" />
               </button>
             </div>
           </div>

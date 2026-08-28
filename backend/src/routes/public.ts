@@ -1,259 +1,175 @@
 import express, { Request, Response } from 'express';
-import jwt from 'jsonwebtoken';
-import { body, validationResult } from 'express-validator';
 import { db } from '../database/db';
-import mpesaService from '../services/mpesaService';
-import sessionService from '../services/sessionService';
 import smsService from '../services/smsService';
+import mikrotikService from '../services/mikrotikService';
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'kijanilink_super_secure_secret_key_2026';
 
-// Get all active plans
+// 1. Get all active internet packages
 router.get('/plans', async (req: Request, res: Response) => {
   try {
-    const plans = await db.plan.findMany({
-      where: { isActive: true },
-      orderBy: { price: 'asc' }
-    });
+    const plans = await db.plan.findMany();
     res.json({ success: true, data: plans });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to fetch plans' });
   }
 });
 
-// Register new user
-router.post('/register', [
-  body('phone').notEmpty().withMessage('Valid phone number required')
-], async (req: Request, res: Response) => {
+// 2. Request Package Connection & Instant 10-Min Grace Period Activation (Hotspot or PPPoE)
+router.post('/request-activation', async (req: Request, res: Response) => {
   try {
-    const { phone, email, firstName, lastName } = req.body;
+    const { 
+      fullName, 
+      phone, 
+      location, 
+      connectionType = 'HOTSPOT', 
+      planId, 
+      macAddress: reqMac, 
+      ipAddress: reqIp 
+    } = req.body;
 
-    const existingUser = await db.user.findFirst({
-      where: {
-        OR: [
-          { phone },
-          ...(email ? [{ email }] : [])
-        ]
-      }
-    });
-
-    if (existingUser) {
-      return res.status(409).json({ 
-        success: false, 
-        error: 'User with this phone number or email already exists' 
-      });
+    if (!phone || !planId) {
+      return res.status(400).json({ success: false, error: 'Phone number and Plan are required' });
     }
 
-    const user = await db.user.create({
-      data: {
-        phone,
-        email: email || null,
-        firstName: firstName || null,
-        lastName: lastName || null,
-        role: 'CUSTOMER'
-      }
-    });
+    const plan = await db.plan.findUnique({ where: { id: planId } });
+    if (!plan) {
+      return res.status(404).json({ success: false, error: 'Selected plan not found' });
+    }
 
-    const token = jwt.sign(
-      { userId: user.id },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    await smsService.sendWelcomeMessage(phone, firstName);
-
-    res.status(201).json({
-      success: true,
-      data: {
-        user: {
-          id: user.id,
-          phone: user.phone,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName
-        },
-        token
-      }
-    });
-  } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({ success: false, error: 'Registration failed' });
-  }
-});
-
-// Login user
-router.post('/login', [
-  body('phone').notEmpty().withMessage('Valid phone number required')
-], async (req: Request, res: Response) => {
-  try {
-    const { phone } = req.body;
-
-    let user = await db.user.findFirst({
-      where: { phone }
-    });
-
+    // Find or create customer
+    let user = await db.user.findFirst({ where: { phone } });
     if (!user) {
-      // Auto register for seamless captive portal experience
       user = await db.user.create({
         data: {
           phone,
+          firstName: fullName?.split(' ')[0] || 'Customer',
+          lastName: fullName?.split(' ')[1] || '',
+          location: location || 'Hotspot Zone',
           role: 'CUSTOMER'
         }
       });
     }
 
-    const token = jwt.sign(
-      { userId: user.id },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    const sessionToken = 'kj_grace_' + Math.random().toString(36).substring(2, 10);
+    const mac = reqMac || 'DC:A6:32:' + Math.floor(10 + Math.random() * 89) + ':89:FA';
+    const ip = reqIp || '192.168.88.' + Math.floor(100 + Math.random() * 150);
 
-    res.json({
-      success: true,
-      data: {
-        user: {
-          id: user.id,
-          phone: user.phone,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName
-        },
-        token
-      }
-    });
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ success: false, error: 'Login failed' });
-  }
-});
+    // Generate PPPoE credentials if PPPoE is chosen
+    const pppoeUsername = connectionType === 'PPPOE' ? `${phone.replace(/\D/g, '')}@kijanilink` : null;
+    const pppoePassword = connectionType === 'PPPOE' ? `pass${Math.floor(1000 + Math.random() * 9000)}` : null;
 
-// Initiate payment (STK Push)
-router.post('/payment', [
-  body('phone').notEmpty().withMessage('Valid phone number required'),
-  body('planId').notEmpty().withMessage('Valid plan ID required')
-], async (req: Request, res: Response) => {
-  try {
-    const { phone, planId, amount: requestedAmount } = req.body;
+    // Create Activation Request with 10-Minute Grace Access
+    const graceMinutes = 10;
+    const graceExpiresAt = new Date(Date.now() + graceMinutes * 60 * 1000).toISOString();
 
-    let user = await db.user.findFirst({
-      where: { phone }
-    });
-
-    if (!user) {
-      user = await db.user.create({
-        data: {
-          phone,
-          role: 'CUSTOMER'
-        }
-      });
-    }
-
-    const plan = await db.plan.findUnique({
-      where: { id: planId }
-    });
-
-    if (!plan || !plan.isActive) {
-      return res.status(404).json({ success: false, error: 'Plan not found or inactive' });
-    }
-
-    const finalAmount = requestedAmount || plan.price;
-
-    const payment = await db.payment.create({
+    const activation = await db.activation.create({
       data: {
         userId: user.id,
-        planId,
-        amount: finalAmount,
-        status: 'PENDING',
-        paymentMethod: 'MPESA_STK'
-      }
-    });
-
-    const stkResponse = await mpesaService.initiateSTKPush({
-      phone,
-      amount: finalAmount,
-      accountReference: `KIJANI-${payment.id.slice(-6).toUpperCase()}`,
-      transactionDesc: `KijaniLink WiFi: ${plan.name}`
-    });
-
-    await db.payment.update({
-      where: { id: payment.id },
-      data: {
-        checkoutRequestId: stkResponse.CheckoutRequestID
-      }
-    });
-
-    res.json({
-      success: true,
-      data: {
-        paymentId: payment.id,
-        checkoutRequestId: stkResponse.CheckoutRequestID,
-        customerMessage: stkResponse.CustomerMessage,
-        amount: finalAmount,
+        fullName: fullName || user.firstName || 'Hotspot Customer',
         phone,
-        planName: plan.name
+        location: location || 'Hotspot Zone',
+        connectionType: connectionType as any,
+        pppoeUsername,
+        pppoePassword,
+        planId: plan.id,
+        macAddress: mac,
+        ipAddress: ip,
+        status: 'PENDING_APPROVAL',
+        gracePeriodMinutes: graceMinutes,
+        graceExpiresAt,
+        sessionToken
       }
     });
-  } catch (error) {
-    console.error('Payment initiation error:', error);
-    res.status(500).json({ success: false, error: 'Payment initiation failed' });
-  }
-});
 
-// Check payment status
-router.get('/payment/status/:checkoutRequestId', async (req: Request, res: Response) => {
-  try {
-    const { checkoutRequestId } = req.params;
-
-    const payment = await db.payment.findUnique({
-      where: { checkoutRequestId },
-      include: { user: true, plan: true }
+    // Provision temporary 10-min grace session
+    await db.session.create({
+      data: {
+        userId: user.id,
+        planId: plan.id,
+        macAddress: mac,
+        ipAddress: ip,
+        endTime: graceExpiresAt,
+        status: 'GRACE_PERIOD',
+        sessionToken,
+        isGracePeriod: true
+      }
     });
 
-    if (!payment) {
-      return res.status(404).json({ success: false, error: 'Payment record not found' });
-    }
+    // Notify MikroTik RouterOS for temporary unblock
+    await mikrotikService.createHotspotUser(sessionToken, sessionToken, 'grace_10min');
 
-    if (payment.status === 'COMPLETED') {
-      let session = await db.session.findFirst({
-        where: {
-          userId: payment.userId,
-          planId: payment.planId,
-          status: 'ACTIVE'
-        }
-      });
-
-      if (!session) {
-        const sessionToken = 'kj_live_' + Math.random().toString(36).substring(2, 12);
-        session = await sessionService.createSession(payment.userId, payment.planId, sessionToken);
-      }
-
-      return res.json({
-        success: true,
-        data: {
-          status: 'completed',
-          sessionToken: session.sessionToken,
-          amount: payment.amount,
-          receiptNumber: payment.mpesaReceiptNumber || 'KJL-CONFIRMED',
-          plan: payment.plan
-        }
-      });
-    }
+    // Send SMS alert to customer
+    await smsService.sendSMS(
+      phone,
+      `KijaniLink: Your ${plan.name} request has been received! You have 10 mins instant grace internet access while admin approval is in progress.`
+    );
 
     res.json({
       success: true,
       data: {
-        status: payment.status.toLowerCase(),
-        amount: payment.amount
+        requestId: activation.id,
+        sessionToken,
+        status: 'PENDING_APPROVAL',
+        graceExpiresAt,
+        gracePeriodMinutes: graceMinutes,
+        planName: plan.name,
+        speedLimit: plan.speedLimit,
+        price: plan.price,
+        connectionType,
+        pppoeUsername,
+        pppoePassword,
+        message: '10-minute grace internet session activated. Awaiting admin approval for full package.'
       }
     });
   } catch (error) {
-    console.error('Payment status check error:', error);
-    res.status(500).json({ success: false, error: 'Failed to check payment status' });
+    console.error('Request activation error:', error);
+    res.status(500).json({ success: false, error: 'Failed to request activation' });
   }
 });
 
-// Redeem Voucher Code
+// 3. Poll Activation & Session Status
+router.get('/activation-status/:requestId', async (req: Request, res: Response) => {
+  try {
+    const { requestId } = req.params;
+    const activation = await db.activation.findUnique({ where: { id: requestId } });
+
+    if (!activation) {
+      return res.status(404).json({ success: false, error: 'Request not found' });
+    }
+
+    const plan = await db.plan.findUnique({ where: { id: activation.planId } });
+
+    const isGraceExpired = new Date() > new Date(activation.graceExpiresAt);
+
+    res.json({
+      success: true,
+      data: {
+        id: activation.id,
+        status: activation.status,
+        fullName: activation.fullName,
+        phone: activation.phone,
+        connectionType: activation.connectionType,
+        pppoeUsername: activation.pppoeUsername,
+        pppoePassword: activation.pppoePassword,
+        graceExpiresAt: activation.graceExpiresAt,
+        fullExpiresAt: activation.fullExpiresAt,
+        approvedAt: activation.approvedAt,
+        approvedBy: activation.approvedBy,
+        isGraceExpired,
+        sessionToken: activation.sessionToken,
+        planName: plan?.name || 'High Speed Plan',
+        speedLimit: plan?.speedLimit || '25 Mbps',
+        duration: plan?.duration || 24,
+        price: plan?.price || 150
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to check status' });
+  }
+});
+
+// 4. Redeem Voucher
 router.post('/voucher/redeem', async (req: Request, res: Response) => {
   try {
     const { code, phone } = req.body;
@@ -262,104 +178,91 @@ router.post('/voucher/redeem', async (req: Request, res: Response) => {
     }
 
     const cleanCode = code.trim().toUpperCase();
-    const voucher = await db.voucher.findUnique({
-      where: { code: cleanCode }
-    });
+    const voucher = await db.voucher.findUnique({ where: { code: cleanCode } });
 
     if (!voucher) {
-      return res.status(404).json({ success: false, error: 'Invalid voucher code. Please double check.' });
+      return res.status(404).json({ success: false, error: 'Invalid voucher code.' });
     }
 
     if (voucher.isRedeemed) {
       return res.status(400).json({ success: false, error: 'This voucher has already been redeemed.' });
     }
 
-    if (new Date() > new Date(voucher.expiresAt)) {
-      return res.status(400).json({ success: false, error: 'This voucher has expired.' });
-    }
-
-    let user = null;
-    if (phone) {
-      user = await db.user.findFirst({ where: { phone } });
-      if (!user) {
-        user = await db.user.create({ data: { phone, role: 'CUSTOMER' } });
-      }
-    } else {
-      user = await db.user.findFirst({ where: { role: 'CUSTOMER' } });
-    }
-
     const plan = await db.plan.findUnique({ where: { id: voucher.planId } }) || (await db.plan.findMany())[0];
 
     await db.voucher.update({
       where: { code: cleanCode },
-      data: {
-        isRedeemed: true,
-        redeemedAt: new Date().toISOString(),
-        userId: user?.id || null
-      }
+      data: { isRedeemed: true, redeemedAt: new Date().toISOString() }
     });
 
     const sessionToken = 'kj_vch_' + Math.random().toString(36).substring(2, 12);
-    const session = await sessionService.createSession(user?.id || 'usr-guest', plan.id, sessionToken);
+    const endTime = new Date(Date.now() + plan.duration * 3600 * 1000).toISOString();
+
+    await db.session.create({
+      data: {
+        userId: 'usr-vch',
+        planId: plan.id,
+        endTime,
+        status: 'ACTIVE',
+        sessionToken,
+        isGracePeriod: false
+      }
+    });
 
     res.json({
       success: true,
       data: {
-        message: 'Voucher redeemed successfully!',
+        message: 'Voucher redeemed successfully! Full package activated.',
         planName: plan.name,
         speedLimit: plan.speedLimit,
         duration: plan.duration,
-        sessionToken: session.sessionToken
+        sessionToken,
+        fullExpiresAt: endTime
       }
     });
   } catch (error) {
-    console.error('Voucher redeem error:', error);
     res.status(500).json({ success: false, error: 'Voucher redemption failed' });
   }
 });
 
-// Connect to internet (Captive Portal Login Action)
-router.post('/connect', [
-  body('sessionToken').notEmpty().withMessage('Session token required')
-], async (req: Request, res: Response) => {
+// 5. Connect Session
+router.post('/connect', async (req: Request, res: Response) => {
   try {
     const { sessionToken } = req.body;
-    const session = await sessionService.getActiveSession(sessionToken);
-    
+    const session = await db.session.findUnique({ where: { sessionToken } });
+
     if (!session) {
-      return res.status(401).json({ success: false, error: 'Invalid or expired session token' });
+      return res.status(401).json({ success: false, error: 'Invalid session token' });
     }
 
     res.json({
       success: true,
       data: {
-        message: 'Connected to KijaniLink High-Speed Network',
+        message: 'Connected to KijaniLink Broadband',
         session: {
           id: session.id,
-          plan: session.plan?.name || 'High Speed Plan',
-          speedLimit: session.plan?.speedLimit || '20 Mbps',
-          ipAddress: session.ipAddress || '192.168.88.105',
-          endTime: session.endTime
+          plan: session.plan?.name || 'Kijani Package',
+          speedLimit: session.plan?.speedLimit || '25 Mbps',
+          endTime: session.endTime,
+          isGracePeriod: session.isGracePeriod
         }
       }
     });
   } catch (error) {
-    console.error('Connection error:', error);
-    res.status(500).json({ success: false, error: 'Connection failed' });
+    res.status(500).json({ success: false, error: 'Connection check failed' });
   }
 });
 
-// Network status check
+// 6. Network status
 router.get('/status', (req: Request, res: Response) => {
   res.json({
     success: true,
     data: {
-      network: 'KijaniLink Ultra-Broadband WiFi',
-      gateway: 'Online (10Gbps Core Fiber Backbone)',
-      location: 'Nairobi Metro Edge #04',
-      latency: '12ms',
-      dns: '1.1.1.1 / 8.8.8.8',
-      activeHotspotUsers: 142
+      network: 'KijaniLink Ultra-Broadband WiFi & PPPoE',
+      gateway: 'Online (10Gbps SEACOM Ring)',
+      location: 'Nairobi Core Edge #04',
+      latency: '11ms',
+      activeHotspotUsers: 42
     }
   });
 });

@@ -110,6 +110,21 @@
   ],
   "sessions": [
     {
+      "id": "sess-uy9l6dp",
+      "userId": "usr-admin-01",
+      "planId": "plan-24hr",
+      "macAddress": "DC:A6:32:46:89:FA",
+      "ipAddress": "192.168.88.121",
+      "startTime": "2026-08-28T14:28:32.533Z",
+      "endTime": "2026-08-29T14:28:37.045Z",
+      "status": "ACTIVE",
+      "dataUsed": 0,
+      "sessionToken": "kj_grace_qok3y7md",
+      "isGracePeriod": false,
+      "createdAt": "2026-08-28T14:28:32.533Z",
+      "updatedAt": "2026-08-28T14:28:37.045Z"
+    },
+    {
       "id": "sess-001",
       "userId": "usr-cust-01",
       "planId": "plan-1hr",
@@ -141,6 +156,16 @@
     }
   ],
   "payments": [
+    {
+      "id": "pay-uqeon8c",
+      "userId": "usr-admin-01",
+      "planId": "plan-24hr",
+      "amount": 150,
+      "status": "COMPLETED",
+      "paymentMethod": "ADMIN_MANUAL_APPROVAL",
+      "createdAt": "2026-08-28T14:28:37.046Z",
+      "updatedAt": "2026-08-28T14:28:37.046Z"
+    },
     {
       "id": "pay-001",
       "userId": "usr-cust-01",
@@ -219,5 +244,29 @@
       "createdAt": "2026-08-28T14:13:30.575Z"
     }
   ],
-  "systemConfigs": []
+  "systemConfigs": [],
+  "activations": [
+    {
+      "id": "act-wb3g27q",
+      "userId": "usr-admin-01",
+      "fullName": "Dennis Test",
+      "phone": "+254799112233",
+      "location": "Block C Room 10",
+      "connectionType": "HOTSPOT",
+      "pppoeUsername": null,
+      "pppoePassword": null,
+      "planId": "plan-24hr",
+      "macAddress": "DC:A6:32:46:89:FA",
+      "ipAddress": "192.168.88.121",
+      "status": "APPROVED",
+      "gracePeriodMinutes": 10,
+      "graceExpiresAt": "2026-08-28T14:38:32.533Z",
+      "sessionToken": "kj_grace_qok3y7md",
+      "createdAt": "2026-08-28T14:28:32.533Z",
+      "updatedAt": "2026-08-28T14:28:37.045Z",
+      "approvedAt": "2026-08-28T14:28:37.045Z",
+      "approvedBy": "Kijani",
+      "fullExpiresAt": "2026-08-29T14:28:37.045Z"
+    }
+  ]
 }

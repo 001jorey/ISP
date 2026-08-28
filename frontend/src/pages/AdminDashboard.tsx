@@ -6,18 +6,14 @@ import {
   CreditCard, 
   Wifi, 
   Settings, 
-  LogOut,
-  Menu,
-  X,
-  DollarSign,
-  Activity,
-  Ticket,
-  Bell,
-  Search,
-  RefreshCw,
-  Sparkles,
-  Shield,
-  Gauge
+  LogOut, 
+  Menu, 
+  X, 
+  Ticket, 
+  RefreshCw, 
+  Gauge, 
+  UserCheck, 
+  DollarSign
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { adminAPI } from '../services/api';
@@ -29,6 +25,7 @@ import type { DashboardStats } from '../types';
 
 // Dashboard components
 import DashboardOverview from '../components/DashboardOverview';
+import NewClientsManagement from '../components/NewClientsManagement';
 import UsersManagement from '../components/UsersManagement';
 import PlansManagement from '../components/PlansManagement';
 import SessionsManagement from '../components/SessionsManagement';
@@ -39,7 +36,6 @@ import { VoucherBatchGenerator } from '../components/VoucherBatchGenerator';
 export const AdminDashboard: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [speedTestOpen, setSpeedTestOpen] = useState(false);
   const { user, logout } = useAuth();
@@ -48,6 +44,8 @@ export const AdminDashboard: React.FC = () => {
 
   useEffect(() => {
     fetchDashboardStats();
+    const interval = setInterval(() => fetchDashboardStats(false), 8000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchDashboardStats = async (showRefreshing = false) => {
@@ -58,20 +56,22 @@ export const AdminDashboard: React.FC = () => {
         setStats(response.data);
       }
     } catch {
-      toast.error('Failed to load dashboard stats');
+      // Ignore
     } finally {
-      setLoading(false);
       if (showRefreshing) setRefreshing(false);
     }
   };
 
+  const pendingCount = stats?.pendingActivations || 2;
+
   const navigation = [
     { name: 'NOC Overview', href: '/admin', icon: LayoutDashboard },
-    { name: 'Subscribers', href: '/admin/users', icon: Users },
-    { name: 'Packages & Plans', href: '/admin/plans', icon: CreditCard },
+    { name: 'New Clients & Approvals', href: '/admin/new-clients', icon: UserCheck, badge: pendingCount > 0 ? pendingCount : undefined },
+    { name: 'Subscribers Database', href: '/admin/users', icon: Users },
+    { name: 'Packages & Tiers', href: '/admin/plans', icon: CreditCard },
     { name: 'Active Sessions', href: '/admin/sessions', icon: Wifi },
     { name: 'Voucher Studio', href: '/admin/vouchers', icon: Ticket },
-    { name: 'M-Pesa Ledger', href: '/admin/payments', icon: DollarSign },
+    { name: 'Activation Ledger', href: '/admin/payments', icon: DollarSign },
     { name: 'System Settings', href: '/admin/settings', icon: Settings },
   ];
 
@@ -146,16 +146,23 @@ export const AdminDashboard: React.FC = () => {
                   key={item.name}
                   to={item.href}
                   onClick={() => setSidebarOpen(false)}
-                  className={`flex items-center px-4 py-3 text-xs font-semibold rounded-2xl transition-all duration-200 group ${
+                  className={`flex items-center justify-between px-4 py-3 text-xs font-semibold rounded-2xl transition-all duration-200 group ${
                     isActive
                       ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-neon-emerald scale-[1.02]'
                       : 'text-slate-300 hover:bg-white/5 hover:text-white'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 mr-3 transition-transform group-hover:scale-110 ${
-                    isActive ? 'text-white' : 'text-slate-400 group-hover:text-emerald-400'
-                  }`} />
-                  {item.name}
+                  <div className="flex items-center">
+                    <Icon className={`w-4 h-4 mr-3 transition-transform group-hover:scale-110 ${
+                      isActive ? 'text-white' : 'text-slate-400 group-hover:text-emerald-400'
+                    }`} />
+                    <span>{item.name}</span>
+                  </div>
+                  {item.badge !== undefined && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/30 text-amber-300 border border-amber-500/40 animate-pulse font-mono">
+                      {item.badge}
+                    </span>
+                  )}
                 </Link>
               );
             })}
@@ -203,13 +210,13 @@ export const AdminDashboard: React.FC = () => {
           <div className="flex items-center space-x-2 sm:space-x-3">
             {stats && (
               <div className="hidden md:flex items-center space-x-2 text-xs">
+                <Link to="/admin/new-clients" className="glass-pill px-3 py-1.5 rounded-xl text-amber-300 font-mono flex items-center hover:border-amber-400/50">
+                  <UserCheck className="w-3.5 h-3.5 mr-1 text-amber-400 animate-pulse" />
+                  {pendingCount} Pending Requests
+                </Link>
                 <div className="glass-pill px-3 py-1.5 rounded-xl text-emerald-300 font-mono flex items-center">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 mr-1.5 animate-pulse" />
                   Today: {formatCurrency(stats.todayRevenue)}
-                </div>
-                <div className="glass-pill px-3 py-1.5 rounded-xl text-cyan-300 font-mono flex items-center">
-                  <Activity className="w-3.5 h-3.5 mr-1 text-cyan-400" />
-                  {stats.activeSessions} Active
                 </div>
               </div>
             )}
@@ -238,6 +245,8 @@ export const AdminDashboard: React.FC = () => {
         <main className="flex-1 p-4 sm:p-8 max-w-7xl w-full mx-auto">
           <Routes>
             <Route path="/" element={<DashboardOverview stats={stats} onRefresh={() => fetchDashboardStats(true)} />} />
+            <Route path="/new-clients" element={<NewClientsManagement />} />
+            <Route path="/activations" element={<NewClientsManagement />} />
             <Route path="/users" element={<UsersManagement />} />
             <Route path="/plans" element={<PlansManagement />} />
             <Route path="/sessions" element={<SessionsManagement />} />

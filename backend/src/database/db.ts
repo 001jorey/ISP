@@ -9,6 +9,7 @@ export interface User {
   password?: string | null;
   firstName?: string | null;
   lastName?: string | null;
+  location?: string | null;
   role: 'CUSTOMER' | 'ADMIN' | 'SUPER_ADMIN' | 'TECHNICIAN' | 'SUPPORT';
   isActive: boolean;
   createdAt: string;
@@ -24,6 +25,8 @@ export interface Plan {
   dataLimit: string;
   speedLimit: string;
   isActive: boolean;
+  badge?: string;
+  isPopular?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -36,12 +39,40 @@ export interface Session {
   ipAddress?: string | null;
   startTime: string;
   endTime?: string | null;
-  status: 'ACTIVE' | 'EXPIRED' | 'TERMINATED';
+  status: 'ACTIVE' | 'EXPIRED' | 'TERMINATED' | 'GRACE_PERIOD';
   dataUsed: number;
   sessionToken: string;
   routerSessionId?: string | null;
+  isGracePeriod?: boolean;
   createdAt: string;
   updatedAt: string;
+  user?: User | null;
+  plan?: Plan | null;
+}
+
+export interface ClientActivationRequest {
+  id: string;
+  userId: string;
+  fullName: string;
+  phone: string;
+  location: string;
+  connectionType: 'HOTSPOT' | 'PPPOE';
+  pppoeUsername?: string | null;
+  pppoePassword?: string | null;
+  planId: string;
+  macAddress: string;
+  ipAddress: string;
+  status: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'EXPIRED';
+  gracePeriodMinutes: number;
+  graceExpiresAt: string;
+  sessionToken: string;
+  approvedAt?: string | null;
+  approvedBy?: string | null;
+  fullExpiresAt?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  plan?: Plan;
 }
 
 export interface Payment {
@@ -79,6 +110,7 @@ interface DatabaseSchema {
   users: User[];
   plans: Plan[];
   sessions: Session[];
+  activations: ClientActivationRequest[];
   payments: Payment[];
   vouchers: Voucher[];
   systemConfigs: SystemConfig[];
@@ -91,7 +123,7 @@ class LocalDB {
 
   constructor() {
     this.data = this.loadData();
-    if (this.data.plans.length === 0 || this.data.users.length === 0) {
+    if (this.data.plans.length === 0 || this.data.users.length === 0 || !this.data.activations) {
       this.seedDefaults();
     }
   }
@@ -100,7 +132,9 @@ class LocalDB {
     try {
       if (fs.existsSync(DB_FILE)) {
         const raw = fs.readFileSync(DB_FILE, 'utf-8');
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        if (!parsed.activations) parsed.activations = [];
+        return parsed;
       }
     } catch (e) {
       console.error('Error reading DB_FILE, initializing fresh schema', e);
@@ -109,6 +143,7 @@ class LocalDB {
       users: [],
       plans: [],
       sessions: [],
+      activations: [],
       payments: [],
       vouchers: [],
       systemConfigs: []
@@ -150,6 +185,7 @@ class LocalDB {
       phone: '+254712345678',
       firstName: 'Mwangi',
       lastName: 'Kariuki',
+      location: 'Block B, Apt 302',
       role: 'CUSTOMER',
       isActive: true,
       createdAt: new Date(Date.now() - 3600000 * 24 * 3).toISOString(),
@@ -162,6 +198,7 @@ class LocalDB {
       phone: '+254723456789',
       firstName: 'Faith',
       lastName: 'Chebet',
+      location: 'Sunrise Plaza, Suite 4',
       role: 'CUSTOMER',
       isActive: true,
       createdAt: new Date(Date.now() - 3600000 * 24 * 7).toISOString(),
@@ -174,6 +211,7 @@ class LocalDB {
       phone: '+254734567890',
       firstName: 'Brian',
       lastName: 'Otieno',
+      location: 'Hostel 3, Room 12',
       role: 'CUSTOMER',
       isActive: true,
       createdAt: new Date(Date.now() - 3600000 * 24 * 14).toISOString(),
@@ -189,6 +227,7 @@ class LocalDB {
         duration: 1,
         dataLimit: '1.5GB',
         speedLimit: '15 Mbps',
+        badge: '⚡ Quick Boost',
         isActive: true,
         createdAt: now,
         updatedAt: now
@@ -196,11 +235,12 @@ class LocalDB {
       {
         id: 'plan-3hr',
         name: 'Power Session (3 Hours)',
-        description: 'Ideal for remote meetings, Netflix series & heavy research',
+        description: 'Ideal for remote meetings, YouTube & heavy downloads',
         price: 50,
         duration: 3,
         dataLimit: '5GB',
         speedLimit: '25 Mbps',
+        badge: '🔥 Hot Pick',
         isActive: true,
         createdAt: now,
         updatedAt: now
@@ -213,6 +253,8 @@ class LocalDB {
         duration: 24,
         dataLimit: 'Unlimited',
         speedLimit: '35 Mbps',
+        isPopular: true,
+        badge: '👑 Best Value',
         isActive: true,
         createdAt: now,
         updatedAt: now
@@ -225,6 +267,7 @@ class LocalDB {
         duration: 168,
         dataLimit: 'Unlimited',
         speedLimit: '50 Mbps',
+        badge: '🚀 Pro Tier',
         isActive: true,
         createdAt: now,
         updatedAt: now
@@ -237,60 +280,49 @@ class LocalDB {
         duration: 720,
         dataLimit: 'Unlimited',
         speedLimit: '100 Mbps',
+        badge: '💎 VIP Unlimited',
         isActive: true,
         createdAt: now,
         updatedAt: now
       }
     ];
 
-    const payments: Payment[] = [
+    const activations: ClientActivationRequest[] = [
       {
-        id: 'pay-001',
+        id: 'act-001',
         userId: customer1.id,
+        fullName: 'Mwangi Kariuki',
+        phone: '+254712345678',
+        location: 'Block B, Apt 302',
+        connectionType: 'HOTSPOT',
         planId: plans[2].id,
-        amount: 150,
-        mpesaReceiptNumber: 'SHK89XJ2Q7',
-        checkoutRequestId: 'ws_CO_28082026_01',
-        status: 'COMPLETED',
-        paymentMethod: 'MPESA_STK',
-        createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-        updatedAt: new Date(Date.now() - 3600000 * 2).toISOString()
+        macAddress: 'DC:A6:32:89:12:FA',
+        ipAddress: '192.168.88.145',
+        status: 'PENDING_APPROVAL',
+        gracePeriodMinutes: 10,
+        graceExpiresAt: new Date(Date.now() + 1000 * 60 * 7).toISOString(),
+        sessionToken: 'kj_grace_tok_mwangi_01',
+        createdAt: new Date(Date.now() - 1000 * 60 * 3).toISOString(),
+        updatedAt: now
       },
       {
-        id: 'pay-002',
+        id: 'act-002',
         userId: customer2.id,
+        fullName: 'Faith Chebet',
+        phone: '+254723456789',
+        location: 'Sunrise Plaza, Suite 4',
+        connectionType: 'PPPOE',
+        pppoeUsername: 'faith.chebet@kijani',
+        pppoePassword: 'pass' + Math.floor(1000 + Math.random() * 9000),
         planId: plans[3].id,
-        amount: 750,
-        mpesaReceiptNumber: 'SHK90LM8P2',
-        checkoutRequestId: 'ws_CO_28082026_02',
-        status: 'COMPLETED',
-        paymentMethod: 'MPESA_STK',
-        createdAt: new Date(Date.now() - 3600000 * 8).toISOString(),
-        updatedAt: new Date(Date.now() - 3600000 * 8).toISOString()
-      },
-      {
-        id: 'pay-003',
-        userId: customer3.id,
-        planId: plans[4].id,
-        amount: 2500,
-        mpesaReceiptNumber: 'SHK91ZZ4K9',
-        checkoutRequestId: 'ws_CO_28082026_03',
-        status: 'COMPLETED',
-        paymentMethod: 'MPESA_STK',
-        createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
-        updatedAt: new Date(Date.now() - 3600000 * 24).toISOString()
-      },
-      {
-        id: 'pay-004',
-        userId: customer1.id,
-        planId: plans[0].id,
-        amount: 20,
-        mpesaReceiptNumber: 'SHK92AA1B3',
-        checkoutRequestId: 'ws_CO_28082026_04',
-        status: 'COMPLETED',
-        paymentMethod: 'MPESA_STK',
-        createdAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-        updatedAt: new Date(Date.now() - 1000 * 60 * 25).toISOString()
+        macAddress: 'A4:C3:F0:4B:92:11',
+        ipAddress: '192.168.88.172',
+        status: 'PENDING_APPROVAL',
+        gracePeriodMinutes: 10,
+        graceExpiresAt: new Date(Date.now() + 1000 * 60 * 8).toISOString(),
+        sessionToken: 'kj_grace_tok_faith_02',
+        createdAt: new Date(Date.now() - 1000 * 60 * 2).toISOString(),
+        updatedAt: now
       }
     ];
 
@@ -298,31 +330,17 @@ class LocalDB {
       {
         id: 'sess-001',
         userId: customer1.id,
-        planId: plans[0].id,
+        planId: plans[2].id,
         macAddress: 'DC:A6:32:89:12:FA',
         ipAddress: '192.168.88.145',
-        startTime: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-        endTime: new Date(Date.now() + 1000 * 60 * 35).toISOString(),
-        status: 'ACTIVE',
-        dataUsed: 485 * 1024 * 1024,
-        sessionToken: 'kj_live_tok_89a1f29',
+        startTime: new Date(Date.now() - 1000 * 60 * 3).toISOString(),
+        endTime: new Date(Date.now() + 1000 * 60 * 7).toISOString(),
+        status: 'GRACE_PERIOD',
+        isGracePeriod: true,
+        dataUsed: 145 * 1024 * 1024,
+        sessionToken: 'kj_grace_tok_mwangi_01',
         routerSessionId: '*4F',
-        createdAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-        updatedAt: now
-      },
-      {
-        id: 'sess-002',
-        userId: customer2.id,
-        planId: plans[3].id,
-        macAddress: 'A4:C3:F0:4B:92:11',
-        ipAddress: '192.168.88.172',
-        startTime: new Date(Date.now() - 3600000 * 8).toISOString(),
-        endTime: new Date(Date.now() + 3600000 * 160).toISOString(),
-        status: 'ACTIVE',
-        dataUsed: 3820 * 1024 * 1024,
-        sessionToken: 'kj_live_tok_11a8bc4',
-        routerSessionId: '*5A',
-        createdAt: new Date(Date.now() - 3600000 * 8).toISOString(),
+        createdAt: new Date(Date.now() - 1000 * 60 * 3).toISOString(),
         updatedAt: now
       }
     ];
@@ -336,36 +354,18 @@ class LocalDB {
         isRedeemed: false,
         expiresAt: new Date(Date.now() + 3600000 * 24 * 30).toISOString(),
         createdAt: now
-      },
-      {
-        id: 'vch-002',
-        code: 'KIJANI-5542-TURBO',
-        planId: plans[1].id,
-        amount: 50,
-        isRedeemed: false,
-        expiresAt: new Date(Date.now() + 3600000 * 24 * 30).toISOString(),
-        createdAt: now
-      },
-      {
-        id: 'vch-003',
-        code: 'KIJANI-8812-ULTRA',
-        planId: plans[2].id,
-        amount: 150,
-        isRedeemed: false,
-        expiresAt: new Date(Date.now() + 3600000 * 24 * 30).toISOString(),
-        createdAt: now
       }
     ];
 
     this.data.users = [adminUser, customer1, customer2, customer3];
     this.data.plans = plans;
-    this.data.payments = payments;
+    this.data.activations = activations;
     this.data.sessions = sessions;
+    this.data.payments = [];
     this.data.vouchers = vouchers;
     this.save();
   }
 
-  // Model accessors mimicking Prisma
   get user() {
     return {
       findUnique: async ({ where }: { where: { email?: string; phone?: string; id?: string } }): Promise<User | null> => {
@@ -379,70 +379,17 @@ class LocalDB {
       findFirst: async ({ where }: { where?: any }): Promise<User | null> => {
         if (!where) return this.data.users[0] || null;
         return this.data.users.find(u => {
-          if (where.OR && Array.isArray(where.OR)) {
-            return where.OR.some((cond: any) => {
-              if (cond.phone && u.phone === cond.phone) return true;
-              if (cond.email && u.email === cond.email) return true;
-              return false;
-            });
-          }
-          if (where.role && u.role !== where.role) return false;
-          if (where.isActive !== undefined && u.isActive !== where.isActive) return false;
-          if (where.phone && u.phone !== where.phone) return false;
-          if (where.email && u.email !== where.email) return false;
+          if (where.phone && u.phone === where.phone) return true;
+          if (where.email && u.email === where.email) return true;
           return true;
         }) || null;
       },
-      findMany: async (args?: { where?: any; skip?: number; take?: number; orderBy?: any; include?: any; select?: any }): Promise<any[]> => {
+      findMany: async (args?: any): Promise<User[]> => {
         let results = [...this.data.users];
         if (args?.where) {
-          const w = args.where;
-          results = results.filter(u => {
-            if (w.role && u.role !== w.role) return false;
-            if (w.isActive !== undefined && u.isActive !== w.isActive) return false;
-            if (w.OR && Array.isArray(w.OR)) {
-              return w.OR.some((cond: any) => {
-                const search = cond.phone?.contains || cond.email?.contains || cond.firstName?.contains || cond.lastName?.contains;
-                if (!search) return true;
-                const s = search.toLowerCase();
-                return (
-                  u.phone.toLowerCase().includes(s) ||
-                  (u.email && u.email.toLowerCase().includes(s)) ||
-                  (u.firstName && u.firstName.toLowerCase().includes(s)) ||
-                  (u.lastName && u.lastName.toLowerCase().includes(s))
-                );
-              });
-            }
-            return true;
-          });
+          if (args.where.role) results = results.filter(u => u.role === args.where.role);
         }
-        if (args?.orderBy?.createdAt === 'desc') {
-          results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        }
-        const skip = args?.skip || 0;
-        const take = args?.take !== undefined ? args.take : results.length;
-        const paginated = results.slice(skip, skip + take);
-
-        return paginated.map(u => {
-          const userObj: any = { ...u };
-          if (args?.include?.sessions) {
-            userObj.sessions = this.data.sessions.filter(s => s.userId === u.id && s.status === 'ACTIVE').slice(0, 1);
-          }
-          if (args?.include?._count) {
-            userObj._count = {
-              sessions: this.data.sessions.filter(s => s.userId === u.id).length,
-              payments: this.data.payments.filter(p => p.userId === u.id).length
-            };
-          }
-          if (args?.select) {
-            const res: any = {};
-            for (const k of Object.keys(args.select)) {
-              if (args.select[k]) res[k] = userObj[k];
-            }
-            return res;
-          }
-          return userObj;
-        });
+        return results;
       },
       create: async ({ data }: { data: Partial<User> }): Promise<User> => {
         const id = 'usr-' + Math.random().toString(36).substring(2, 9);
@@ -454,8 +401,9 @@ class LocalDB {
           password: data.password ? bcrypt.hashSync(data.password, 10) : null,
           firstName: data.firstName || null,
           lastName: data.lastName || null,
+          location: data.location || null,
           role: (data.role as any) || 'CUSTOMER',
-          isActive: data.isActive !== undefined ? data.isActive : true,
+          isActive: true,
           createdAt: now,
           updatedAt: now
         };
@@ -463,32 +411,111 @@ class LocalDB {
         this.save();
         return newUser;
       },
-      upsert: async ({ where, create, update }: { where: { email?: string }; create: any; update: any }): Promise<User> => {
-        const existing = await this.user.findUnique({ where });
-        if (existing) {
-          return this.user.update({ where: { id: existing.id }, data: update });
-        }
-        return this.user.create({ data: create });
-      },
       update: async ({ where, data }: { where: { id?: string }; data: Partial<User> }): Promise<User> => {
         const idx = this.data.users.findIndex(u => u.id === where.id);
         if (idx === -1) throw new Error('User not found');
-        this.data.users[idx] = {
-          ...this.data.users[idx],
+        this.data.users[idx] = { ...this.data.users[idx], ...data, updatedAt: new Date().toISOString() };
+        this.save();
+        return this.data.users[idx];
+      },
+      count: async (args?: any): Promise<number> => {
+        if (args?.where?.role) return this.data.users.filter(u => u.role === args.where.role).length;
+        return this.data.users.length;
+      }
+    };
+  }
+
+  get activation() {
+    return {
+      findUnique: async ({ where }: { where: { id?: string; sessionToken?: string } }): Promise<ClientActivationRequest | null> => {
+        const item = this.data.activations.find(a => {
+          if (where.id && a.id === where.id) return true;
+          if (where.sessionToken && a.sessionToken === where.sessionToken) return true;
+          return false;
+        });
+        if (!item) return null;
+        return {
+          ...item,
+          plan: this.data.plans.find(p => p.id === item.planId)
+        };
+      },
+      findFirst: async ({ where }: { where?: any }): Promise<ClientActivationRequest | null> => {
+        const item = this.data.activations.find(a => {
+          if (where?.phone && a.phone === where.phone) return true;
+          if (where?.sessionToken && a.sessionToken === where.sessionToken) return true;
+          if (where?.macAddress && a.macAddress === where.macAddress) return true;
+          return false;
+        });
+        if (!item) return null;
+        return {
+          ...item,
+          plan: this.data.plans.find(p => p.id === item.planId)
+        };
+      },
+      findMany: async (args?: { where?: any; orderBy?: any }): Promise<ClientActivationRequest[]> => {
+        let list = [...this.data.activations];
+        if (args?.where) {
+          if (args.where.status) list = list.filter(a => a.status === args.where.status);
+          if (args.where.connectionType) list = list.filter(a => a.connectionType === args.where.connectionType);
+        }
+        list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        return list.map(item => ({
+          ...item,
+          plan: this.data.plans.find(p => p.id === item.planId)
+        }));
+      },
+      create: async ({ data }: { data: Partial<ClientActivationRequest> }): Promise<ClientActivationRequest> => {
+        const id = 'act-' + Math.random().toString(36).substring(2, 9);
+        const now = new Date().toISOString();
+        const graceMins = data.gracePeriodMinutes || 10;
+        const graceExpiresAt = new Date(Date.now() + graceMins * 60 * 1000).toISOString();
+
+        const newActivation: ClientActivationRequest = {
+          id,
+          userId: data.userId || 'usr-guest',
+          fullName: data.fullName || 'Hotspot Customer',
+          phone: data.phone!,
+          location: data.location || 'Hotspot Zone',
+          connectionType: data.connectionType || 'HOTSPOT',
+          pppoeUsername: data.pppoeUsername || null,
+          pppoePassword: data.pppoePassword || null,
+          planId: data.planId!,
+          macAddress: data.macAddress || 'DC:A6:32:89:12:FA',
+          ipAddress: data.ipAddress || '192.168.88.105',
+          status: 'PENDING_APPROVAL',
+          gracePeriodMinutes: graceMins,
+          graceExpiresAt,
+          sessionToken: data.sessionToken || ('kj_grace_' + Math.random().toString(36).substring(2, 10)),
+          createdAt: now,
+          updatedAt: now
+        };
+
+        this.data.activations.unshift(newActivation);
+        this.save();
+        return {
+          ...newActivation,
+          plan: this.data.plans.find(p => p.id === newActivation.planId)
+        };
+      },
+      update: async ({ where, data }: { where: { id: string }; data: Partial<ClientActivationRequest> }): Promise<ClientActivationRequest> => {
+        const idx = this.data.activations.findIndex(a => a.id === where.id);
+        if (idx === -1) throw new Error('Activation request not found');
+        this.data.activations[idx] = {
+          ...this.data.activations[idx],
           ...data,
           updatedAt: new Date().toISOString()
         };
         this.save();
-        return this.data.users[idx];
+        return {
+          ...this.data.activations[idx],
+          plan: this.data.plans.find(p => p.id === this.data.activations[idx].planId)
+        };
       },
-      count: async (args?: { where?: any }): Promise<number> => {
-        if (!args?.where) return this.data.users.length;
-        const w = args.where;
-        return this.data.users.filter(u => {
-          if (w.role && u.role !== w.role) return false;
-          if (w.isActive !== undefined && u.isActive !== w.isActive) return false;
-          return true;
-        }).length;
+      count: async (args?: any): Promise<number> => {
+        if (args?.where?.status) {
+          return this.data.activations.filter(a => a.status === args.where.status).length;
+        }
+        return this.data.activations.length;
       }
     };
   }
@@ -496,34 +523,14 @@ class LocalDB {
   get plan() {
     return {
       findUnique: async ({ where }: { where: { id?: string; isActive?: boolean } }): Promise<Plan | null> => {
-        return this.data.plans.find(p => {
-          if (where.id && p.id !== where.id) return false;
-          if (where.isActive !== undefined && p.isActive !== where.isActive) return false;
-          return true;
-        }) || null;
+        return this.data.plans.find(p => p.id === where.id) || null;
       },
-      findMany: async (args?: { where?: any; orderBy?: any; include?: any }): Promise<any[]> => {
+      findMany: async (args?: any): Promise<Plan[]> => {
         let results = [...this.data.plans];
-        if (args?.where) {
-          if (args.where.isActive !== undefined) {
-            results = results.filter(p => p.isActive === args.where.isActive);
-          }
+        if (args?.where?.isActive !== undefined) {
+          results = results.filter(p => p.isActive === args.where.isActive);
         }
-        if (args?.orderBy?.price === 'asc') {
-          results.sort((a, b) => a.price - b.price);
-        } else if (args?.orderBy?.createdAt === 'desc') {
-          results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        }
-        return results.map(p => {
-          const planObj: any = { ...p };
-          if (args?.include?._count) {
-            planObj._count = {
-              sessions: this.data.sessions.filter(s => s.planId === p.id).length,
-              payments: this.data.payments.filter(pm => pm.planId === p.id).length
-            };
-          }
-          return planObj;
-        });
+        return results;
       },
       create: async ({ data }: { data: any }): Promise<Plan> => {
         const id = 'plan-' + Math.random().toString(36).substring(2, 8);
@@ -536,7 +543,7 @@ class LocalDB {
           duration: Number(data.duration),
           dataLimit: data.dataLimit || 'Unlimited',
           speedLimit: data.speedLimit || '20 Mbps',
-          isActive: data.isActive !== undefined ? data.isActive : true,
+          isActive: true,
           createdAt: now,
           updatedAt: now
         };
@@ -544,121 +551,64 @@ class LocalDB {
         this.save();
         return newPlan;
       },
-      createMany: async ({ data }: { data: any[] }): Promise<{ count: number }> => {
-        for (const item of data) {
-          await this.plan.create({ data: item });
-        }
-        return { count: data.length };
-      },
       update: async ({ where, data }: { where: { id: string }; data: Partial<Plan> }): Promise<Plan> => {
         const idx = this.data.plans.findIndex(p => p.id === where.id);
         if (idx === -1) throw new Error('Plan not found');
-        this.data.plans[idx] = {
-          ...this.data.plans[idx],
-          ...data,
-          price: data.price !== undefined ? Number(data.price) : this.data.plans[idx].price,
-          duration: data.duration !== undefined ? Number(data.duration) : this.data.plans[idx].duration,
-          updatedAt: new Date().toISOString()
-        };
+        this.data.plans[idx] = { ...this.data.plans[idx], ...data, updatedAt: new Date().toISOString() };
         this.save();
         return this.data.plans[idx];
       },
-      deleteMany: async (_args?: any) => {
-        this.data.plans = [];
+      delete: async ({ where }: { where: { id: string } }) => {
+        this.data.plans = this.data.plans.filter(p => p.id !== where.id);
         this.save();
-        return { count: 0 };
       },
-      count: async (_args?: any): Promise<number> => {
-        return this.data.plans.length;
-      }
+      count: async () => this.data.plans.length
     };
   }
 
   get session() {
     return {
-      findUnique: async ({ where, include }: { where: { id?: string; sessionToken?: string }; include?: any }): Promise<any | null> => {
+      findUnique: async ({ where }: { where: { id?: string; sessionToken?: string }; include?: any }): Promise<any | null> => {
         const item = this.data.sessions.find(s => {
           if (where.id && s.id === where.id) return true;
           if (where.sessionToken && s.sessionToken === where.sessionToken) return true;
           return false;
         });
         if (!item) return null;
-        const res: any = { ...item };
-        if (include?.user) res.user = this.data.users.find(u => u.id === item.userId);
-        if (include?.plan) res.plan = this.data.plans.find(p => p.id === item.planId);
-        return res;
+        return {
+          ...item,
+          user: this.data.users.find(u => u.id === item.userId),
+          plan: this.data.plans.find(p => p.id === item.planId)
+        };
       },
-      findFirst: async ({ where, include }: { where?: any; include?: any }): Promise<any | null> => {
-        if (!where) return this.data.sessions[0] || null;
-        const item = this.data.sessions.find(s => {
-          if (where.userId && s.userId !== where.userId) return false;
-          if (where.planId && s.planId !== where.planId) return false;
-          if (where.status && s.status !== where.status) return false;
-          if (where.sessionToken && s.sessionToken !== where.sessionToken) return false;
-          return true;
-        });
-        if (!item) return null;
-        const res: any = { ...item };
-        if (include?.user) res.user = this.data.users.find(u => u.id === item.userId);
-        if (include?.plan) res.plan = this.data.plans.find(p => p.id === item.planId);
-        return res;
+      findMany: async (args?: any): Promise<any[]> => {
+        return this.data.sessions.map(s => ({
+          ...s,
+          user: this.data.users.find(u => u.id === s.userId),
+          plan: this.data.plans.find(p => p.id === s.planId)
+        }));
       },
-      findMany: async (args?: { where?: any; skip?: number; take?: number; orderBy?: any; include?: any }): Promise<any[]> => {
-        let results = [...this.data.sessions];
-        if (args?.where) {
-          const w = args.where;
-          results = results.filter(s => {
-            if (w.status && s.status !== w.status) return false;
-            if (w.userId && s.userId !== w.userId) return false;
-            if (w.endTime?.lt && new Date(s.endTime || 0) >= new Date(w.endTime.lt)) return false;
-            if (w.endTime?.gt && new Date(s.endTime || 0) <= new Date(w.endTime.gt)) return false;
-            return true;
-          });
-        }
-        if (args?.orderBy?.startTime === 'desc') {
-          results.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
-        }
-        const skip = args?.skip || 0;
-        const take = args?.take !== undefined ? args.take : results.length;
-        const sliced = results.slice(skip, skip + take);
-
-        return sliced.map(s => {
-          const obj: any = { ...s };
-          if (args?.include?.user) {
-            const u = this.data.users.find(usr => usr.id === s.userId);
-            obj.user = u ? { phone: u.phone, firstName: u.firstName, lastName: u.lastName } : null;
-          }
-          if (args?.include?.plan) {
-            const p = this.data.plans.find(pl => pl.id === s.planId);
-            obj.plan = p ? { name: p.name, price: p.price, speedLimit: p.speedLimit } : null;
-          }
-          return obj;
-        });
-      },
-      create: async ({ data, include }: { data: any; include?: any }): Promise<any> => {
+      create: async ({ data }: { data: any; include?: any }): Promise<Session> => {
         const id = 'sess-' + Math.random().toString(36).substring(2, 9);
         const now = new Date().toISOString();
         const newSession: Session = {
           id,
           userId: data.userId,
           planId: data.planId,
-          macAddress: data.macAddress || 'EC:F4:BB:22:' + Math.floor(10 + Math.random() * 89) + ':AA',
-          ipAddress: data.ipAddress || '192.168.88.' + Math.floor(100 + Math.random() * 150),
-          startTime: data.startTime ? new Date(data.startTime).toISOString() : now,
-          endTime: data.endTime ? new Date(data.endTime).toISOString() : null,
+          macAddress: data.macAddress || 'DC:A6:32:89:12:FA',
+          ipAddress: data.ipAddress || '192.168.88.105',
+          startTime: now,
+          endTime: data.endTime || null,
           status: data.status || 'ACTIVE',
-          dataUsed: data.dataUsed || 0,
-          sessionToken: data.sessionToken || ('kj_tok_' + Math.random().toString(36).substring(2, 10)),
-          routerSessionId: data.routerSessionId || ('*' + Math.floor(10 + Math.random() * 89).toString(16).toUpperCase()),
+          dataUsed: 0,
+          sessionToken: data.sessionToken,
+          isGracePeriod: data.isGracePeriod || false,
           createdAt: now,
           updatedAt: now
         };
         this.data.sessions.unshift(newSession);
         this.save();
-        const obj: any = { ...newSession };
-        if (include?.user) obj.user = this.data.users.find(u => u.id === newSession.userId);
-        if (include?.plan) obj.plan = this.data.plans.find(p => p.id === newSession.planId);
-        return obj;
+        return newSession;
       },
       update: async ({ where, data }: { where: { id?: string; sessionToken?: string }; data: Partial<Session> }): Promise<Session> => {
         const idx = this.data.sessions.findIndex(s => {
@@ -667,82 +617,38 @@ class LocalDB {
           return false;
         });
         if (idx === -1) throw new Error('Session not found');
-        this.data.sessions[idx] = {
-          ...this.data.sessions[idx],
-          ...data,
-          updatedAt: new Date().toISOString()
-        };
+        this.data.sessions[idx] = { ...this.data.sessions[idx], ...data, updatedAt: new Date().toISOString() };
         this.save();
         return this.data.sessions[idx];
       },
-      count: async (args?: { where?: any }): Promise<number> => {
-        if (!args?.where) return this.data.sessions.length;
-        return this.data.sessions.filter(s => {
-          if (args.where.status && s.status !== args.where.status) return false;
-          return true;
-        }).length;
+      count: async (args?: any): Promise<number> => {
+        if (args?.where?.status) return this.data.sessions.filter(s => s.status === args.where.status).length;
+        return this.data.sessions.length;
       }
     };
   }
 
   get payment() {
     return {
-      findUnique: async ({ where, include }: { where: { id?: string; checkoutRequestId?: string }; include?: any }): Promise<any | null> => {
-        const item = this.data.payments.find(p => {
+      findUnique: async ({ where }: { where: { id?: string; checkoutRequestId?: string } }): Promise<Payment | null> => {
+        return this.data.payments.find(p => {
           if (where.id && p.id === where.id) return true;
           if (where.checkoutRequestId && p.checkoutRequestId === where.checkoutRequestId) return true;
           return false;
-        });
-        if (!item) return null;
-        const obj: any = { ...item };
-        if (include?.user) obj.user = this.data.users.find(u => u.id === item.userId);
-        if (include?.plan) obj.plan = this.data.plans.find(pl => pl.id === item.planId);
-        return obj;
+        }) || null;
       },
-      findMany: async (args?: { where?: any; skip?: number; take?: number; orderBy?: any; include?: any }): Promise<any[]> => {
-        let results = [...this.data.payments];
-        if (args?.where) {
-          const w = args.where;
-          results = results.filter(p => {
-            if (w.status && p.status !== w.status) return false;
-            if (w.createdAt?.gte && new Date(p.createdAt) < new Date(w.createdAt.gte)) return false;
-            return true;
-          });
-        }
-        if (args?.orderBy?.createdAt === 'desc') {
-          results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        }
-        const skip = args?.skip || 0;
-        const take = args?.take !== undefined ? args.take : results.length;
-        const sliced = results.slice(skip, skip + take);
-
-        return sliced.map(p => {
-          const obj: any = { ...p };
-          if (args?.include?.user) {
-            const u = this.data.users.find(usr => usr.id === p.userId);
-            obj.user = u ? { phone: u.phone, firstName: u.firstName, lastName: u.lastName } : null;
-          }
-          if (args?.include?.plan) {
-            const pl = this.data.plans.find(plan => plan.id === p.planId);
-            obj.plan = pl ? { name: pl.name, price: pl.price } : null;
-          }
-          return obj;
-        });
-      },
+      findMany: async (args?: any): Promise<Payment[]> => this.data.payments,
       create: async ({ data }: { data: any }): Promise<Payment> => {
         const id = 'pay-' + Math.random().toString(36).substring(2, 9);
-        const now = new Date().toISOString();
         const newPayment: Payment = {
           id,
           userId: data.userId,
           planId: data.planId,
-          amount: Number(data.amount),
-          mpesaReceiptNumber: data.mpesaReceiptNumber || null,
-          checkoutRequestId: data.checkoutRequestId || ('ws_CO_' + Date.now()),
-          status: data.status || 'PENDING',
-          paymentMethod: data.paymentMethod || 'MPESA',
-          createdAt: now,
-          updatedAt: now
+          amount: data.amount,
+          status: 'COMPLETED',
+          paymentMethod: data.paymentMethod || 'ADMIN_ACTIVATION',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
         };
         this.data.payments.unshift(newPayment);
         this.save();
@@ -755,96 +661,44 @@ class LocalDB {
           return false;
         });
         if (idx === -1) throw new Error('Payment not found');
-        this.data.payments[idx] = {
-          ...this.data.payments[idx],
-          ...data,
-          updatedAt: new Date().toISOString()
-        };
+        this.data.payments[idx] = { ...this.data.payments[idx], ...data, updatedAt: new Date().toISOString() };
         this.save();
         return this.data.payments[idx];
       },
-      aggregate: async ({ where, _sum }: { where?: any; _sum?: { amount?: boolean } }): Promise<{ _sum: { amount: number | null } }> => {
-        let results = [...this.data.payments];
-        if (where) {
-          results = results.filter(p => {
-            if (where.status && p.status !== where.status) return false;
-            if (where.createdAt?.gte && new Date(p.createdAt) < new Date(where.createdAt.gte)) return false;
-            return true;
-          });
-        }
-        const total = results.reduce((acc, curr) => acc + (curr.amount || 0), 0);
-        return { _sum: { amount: total } };
-      },
-      count: async (args?: { where?: any }): Promise<number> => {
-        if (!args?.where) return this.data.payments.length;
-        return this.data.payments.filter(p => {
-          if (args.where.status && p.status !== args.where.status) return false;
-          return true;
-        }).length;
-      }
+      count: async (): Promise<number> => this.data.payments.length
     };
   }
 
   get voucher() {
     return {
-      findUnique: async ({ where }: { where: { id?: string; code?: string } }): Promise<Voucher | null> => {
-        return this.data.vouchers.find(v => {
-          if (where.id && v.id === where.id) return true;
-          if (where.code && v.code.toUpperCase() === where.code.toUpperCase()) return true;
-          return false;
-        }) || null;
+      findUnique: async ({ where }: { where: { code?: string } }): Promise<Voucher | null> => {
+        return this.data.vouchers.find(v => v.code === where.code) || null;
       },
-      findMany: async (args?: { where?: any; orderBy?: any }): Promise<Voucher[]> => {
-        let list = [...this.data.vouchers];
-        if (args?.where) {
-          if (args.where.isRedeemed !== undefined) {
-            list = list.filter(v => v.isRedeemed === args.where.isRedeemed);
-          }
-        }
-        return list;
-      },
+      findMany: async (): Promise<Voucher[]> => this.data.vouchers,
       create: async ({ data }: { data: any }): Promise<Voucher> => {
         const id = 'vch-' + Math.random().toString(36).substring(2, 9);
-        const now = new Date().toISOString();
         const newVoucher: Voucher = {
           id,
-          code: data.code.toUpperCase(),
+          code: data.code,
           planId: data.planId,
-          userId: data.userId || null,
-          amount: data.amount || 0,
+          amount: data.amount,
           isRedeemed: false,
-          redeemedAt: null,
           expiresAt: data.expiresAt || new Date(Date.now() + 3600000 * 24 * 30).toISOString(),
-          createdAt: now
+          createdAt: new Date().toISOString()
         };
         this.data.vouchers.unshift(newVoucher);
         this.save();
         return newVoucher;
       },
-      update: async ({ where, data }: { where: { id?: string; code?: string }; data: Partial<Voucher> }): Promise<Voucher> => {
-        const idx = this.data.vouchers.findIndex(v => {
-          if (where.id && v.id === where.id) return true;
-          if (where.code && v.code.toUpperCase() === where.code.toUpperCase()) return true;
-          return false;
-        });
+      update: async ({ where, data }: { where: { code?: string }; data: Partial<Voucher> }): Promise<Voucher> => {
+        const idx = this.data.vouchers.findIndex(v => v.code === where.code);
         if (idx === -1) throw new Error('Voucher not found');
-        this.data.vouchers[idx] = {
-          ...this.data.vouchers[idx],
-          ...data
-        };
+        this.data.vouchers[idx] = { ...this.data.vouchers[idx], ...data };
         this.save();
         return this.data.vouchers[idx];
       }
     };
   }
-
-  async $disconnect() {
-    this.save();
-  }
 }
 
-// Export singleton instance as PrismaClient replacement
 export const db = new LocalDB();
-export const PrismaClient = function () {
-  return db;
-} as any;

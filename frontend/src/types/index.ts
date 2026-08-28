@@ -1,19 +1,20 @@
 export type UserRole = 'CUSTOMER' | 'ADMIN' | 'SUPER_ADMIN' | 'TECHNICIAN' | 'SUPPORT';
 
+export type ConnectionType = 'HOTSPOT' | 'PPPOE';
+
+export type ActivationStatus = 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'EXPIRED';
+
 export interface User {
   id: string;
   email?: string;
   phone: string;
   firstName?: string;
   lastName?: string;
+  location?: string;
   role: UserRole;
   isActive: boolean;
   createdAt: string;
   sessions?: Session[];
-  _count?: {
-    sessions: number;
-    payments: number;
-  };
 }
 
 export interface Plan {
@@ -29,10 +30,31 @@ export interface Plan {
   isPopular?: boolean;
   createdAt: string;
   updatedAt: string;
-  _count?: {
-    sessions: number;
-    payments: number;
-  };
+}
+
+export interface ClientActivationRequest {
+  id: string;
+  userId: string;
+  fullName: string;
+  phone: string;
+  location: string;
+  connectionType: ConnectionType;
+  pppoeUsername?: string;
+  pppoePassword?: string;
+  planId: string;
+  macAddress: string;
+  ipAddress: string;
+  status: ActivationStatus;
+  gracePeriodMinutes: number;
+  graceExpiresAt: string;
+  sessionToken: string;
+  approvedAt?: string;
+  approvedBy?: string;
+  fullExpiresAt?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  plan?: Plan;
 }
 
 export interface Session {
@@ -43,10 +65,11 @@ export interface Session {
   ipAddress?: string;
   startTime: string;
   endTime?: string;
-  status: 'ACTIVE' | 'EXPIRED' | 'TERMINATED';
+  status: 'ACTIVE' | 'EXPIRED' | 'TERMINATED' | 'GRACE_PERIOD';
   dataUsed: number;
   sessionToken: string;
   routerSessionId?: string;
+  isGracePeriod?: boolean;
   user?: {
     phone: string;
     firstName?: string;
@@ -101,6 +124,7 @@ export interface DashboardStats {
   todayRevenue: number;
   activeSessions: number;
   totalSessions: number;
+  pendingActivations?: number;
   systemHealth?: {
     cpuLoad: number;
     memoryUsage: string;
@@ -148,30 +172,6 @@ export interface ApiResponse<T> {
   error?: string;
   message?: string;
   errors?: Array<{ msg: string; param: string }>;
-}
-
-export interface PaginatedResponse<T> {
-  data: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  };
-}
-
-export interface PaymentRequest {
-  phone: string;
-  planId: string;
-  amount?: number;
-}
-
-export interface PaymentStatusResponse {
-  status: 'pending' | 'completed' | 'failed' | 'timeout';
-  sessionToken?: string;
-  amount?: number;
-  receiptNumber?: string;
-  plan?: Plan;
 }
 
 export interface ConnectionRequest {

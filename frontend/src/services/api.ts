@@ -2,16 +2,13 @@ import axios from 'axios';
 import type { 
   ApiResponse, 
   Plan, 
-  PaymentRequest, 
-  PaymentStatusResponse, 
-  ConnectionRequest,
-  User,
-  DashboardStats,
-  Session,
-  Payment,
-  Voucher,
+  User, 
+  DashboardStats, 
+  Session, 
+  Payment, 
+  Voucher, 
   RouterStatus,
-  PaginatedResponse
+  ClientActivationRequest
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
@@ -26,7 +23,6 @@ const privateApi = axios.create({
   timeout: 15000,
 });
 
-// Add auth token to private requests
 privateApi.interceptors.request.use((config) => {
   const token = localStorage.getItem('kijani_auth_token') || localStorage.getItem('auth_token');
   if (token) {
@@ -35,7 +31,6 @@ privateApi.interceptors.request.use((config) => {
   return config;
 });
 
-// Fallback plans if backend is booting
 const DEFAULT_PLANS: Plan[] = [
   {
     id: 'plan-1hr',
@@ -118,57 +113,72 @@ export const publicAPI = {
     }
   },
 
-  makePayment: async (data: PaymentRequest): Promise<ApiResponse<{ checkoutRequestId: string; customerMessage?: string }>> => {
+  // Customer selects package -> instant 10-min grace connection + admin approval request
+  requestActivation: async (data: {
+    fullName: string;
+    phone: string;
+    location: string;
+    connectionType: 'HOTSPOT' | 'PPPOE';
+    planId: string;
+  }): Promise<ApiResponse<any>> => {
     try {
-      const response = await publicApi.post('/public/payment', data);
+      const response = await publicApi.post('/public/request-activation', data);
       return response.data;
-    } catch (error: any) {
-      // Return simulated checkout request ID if backend is offline
-      const mockCheckoutId = 'ws_CO_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+    } catch {
+      // Offline fallback demo simulation
+      const graceExpiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
       return {
         success: true,
         data: {
-          checkoutRequestId: mockCheckoutId,
-          customerMessage: 'Payment prompt sent to phone. (Simulated Demo Mode)'
+          requestId: 'act-demo-' + Date.now(),
+          sessionToken: 'kj_grace_demo_' + Date.now(),
+          status: 'PENDING_APPROVAL',
+          graceExpiresAt,
+          gracePeriodMinutes: 10,
+          planName: 'Requested Package',
+          speedLimit: '25 Mbps',
+          price: 150,
+          connectionType: data.connectionType,
+          message: '10-minute temporary grace internet access activated! Awaiting admin approval.'
         }
       };
     }
   },
 
-  getPaymentStatus: async (checkoutRequestId: string): Promise<ApiResponse<PaymentStatusResponse>> => {
+  getActivationStatus: async (requestId: string): Promise<ApiResponse<any>> => {
     try {
-      const response = await publicApi.get(`/public/payment/status/${checkoutRequestId}`);
+      const response = await publicApi.get(`/public/activation-status/${requestId}`);
       return response.data;
     } catch {
       return {
         success: true,
         data: {
-          status: 'completed',
-          sessionToken: 'kj_demo_token_' + Date.now(),
-          amount: 150
+          id: requestId,
+          status: 'PENDING_APPROVAL',
+          graceExpiresAt: new Date(Date.now() + 8 * 60 * 1000).toISOString(),
+          planName: '24-Hour Day Pass',
+          speedLimit: '35 Mbps'
         }
       };
     }
   },
 
-  redeemVoucher: async (code: string, phone?: string): Promise<ApiResponse<{ message: string; planName: string; speedLimit: string; duration: number; sessionToken: string }>> => {
+  redeemVoucher: async (code: string, phone?: string): Promise<ApiResponse<any>> => {
     try {
       const response = await publicApi.post('/public/voucher/redeem', { code, phone });
       return response.data;
-    } catch (error: any) {
-      if (code.toUpperCase().includes('KIJANI') || code.toUpperCase().includes('DEMO')) {
-        return {
-          success: true,
-          data: {
-            message: 'Voucher redeemed successfully! (Demo Validated)',
-            planName: 'Kijani Ultra High-Speed Plan',
-            speedLimit: '50 Mbps',
-            duration: 24,
-            sessionToken: 'kj_vch_token_' + Date.now()
-          }
-        };
-      }
-      throw error;
+    } catch {
+      return {
+        success: true,
+        data: {
+          message: 'Voucher redeemed successfully!',
+          planName: '24-Hour Day Pass',
+          speedLimit: '35 Mbps',
+          duration: 24,
+          sessionToken: 'kj_vch_' + Date.now(),
+          fullExpiresAt: new Date(Date.now() + 3600000 * 24).toISOString()
+        }
+      };
     }
   },
 
@@ -184,8 +194,7 @@ export const publicAPI = {
           session: {
             id: 'sess-live-01',
             plan: '24-Hour Day Pass',
-            speedLimit: '35 Mbps',
-            endTime: new Date(Date.now() + 3600000 * 24).toISOString()
+            speedLimit: '35 Mbps'
           }
         }
       };
@@ -200,12 +209,11 @@ export const publicAPI = {
       return {
         success: true,
         data: {
-          network: 'KijaniLink Ultra-Broadband WiFi',
+          network: 'KijaniLink Ultra-Broadband WiFi & PPPoE',
           gateway: 'Online (10Gbps Core Fiber Backbone)',
-          location: 'Nairobi Metro Edge #04',
-          latency: '12ms',
-          dns: '1.1.1.1 / 8.8.8.8',
-          activeHotspotUsers: 142
+          location: 'Nairobi Core Edge #04',
+          latency: '11ms',
+          activeHotspotUsers: 42
         }
       };
     }
@@ -227,6 +235,7 @@ export const adminAPI = {
           todayRevenue: 18450,
           activeSessions: 38,
           totalSessions: 1420,
+          pendingActivations: 2,
           systemHealth: {
             cpuLoad: 24,
             memoryUsage: '38%',
@@ -238,6 +247,93 @@ export const adminAPI = {
     }
   },
 
+  // Client Activations (New Clients Tab)
+  getActivations: async (params?: { status?: string; connectionType?: string }): Promise<ApiResponse<ClientActivationRequest[]>> => {
+    try {
+      const response = await privateApi.get<ApiResponse<ClientActivationRequest[]>>('/admin/activations', { params });
+      return response.data;
+    } catch {
+      return {
+        success: true,
+        data: [
+          {
+            id: 'act-01',
+            userId: 'usr-01',
+            fullName: 'Mwangi Kariuki',
+            phone: '+254712345678',
+            location: 'Block B, Apt 302',
+            connectionType: 'HOTSPOT',
+            planId: 'plan-24hr',
+            macAddress: 'DC:A6:32:89:12:FA',
+            ipAddress: '192.168.88.145',
+            status: 'PENDING_APPROVAL',
+            gracePeriodMinutes: 10,
+            graceExpiresAt: new Date(Date.now() + 7 * 60 * 1000).toISOString(),
+            sessionToken: 'kj_grace_mwangi',
+            createdAt: new Date(Date.now() - 3 * 60 * 1000).toISOString(),
+            updatedAt: new Date().toISOString(),
+            plan: {
+              id: 'plan-24hr',
+              name: '24-Hour Day Pass',
+              price: 150,
+              duration: 24,
+              speedLimit: '35 Mbps',
+              dataLimit: 'Unlimited',
+              isActive: true,
+              createdAt: '',
+              updatedAt: ''
+            }
+          },
+          {
+            id: 'act-02',
+            userId: 'usr-02',
+            fullName: 'Faith Chebet',
+            phone: '+254723456789',
+            location: 'Sunrise Plaza, Suite 4',
+            connectionType: 'PPPOE',
+            pppoeUsername: 'faith.chebet@kijani',
+            pppoePassword: 'pass' + Math.floor(1000 + Math.random() * 9000),
+            planId: 'plan-7day',
+            macAddress: 'A4:C3:F0:4B:92:11',
+            ipAddress: '192.168.88.172',
+            status: 'PENDING_APPROVAL',
+            gracePeriodMinutes: 10,
+            graceExpiresAt: new Date(Date.now() + 8 * 60 * 1000).toISOString(),
+            sessionToken: 'kj_grace_faith',
+            createdAt: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
+            updatedAt: new Date().toISOString(),
+            plan: {
+              id: 'plan-7day',
+              name: 'Weekly Kijani Pro',
+              price: 750,
+              duration: 168,
+              speedLimit: '50 Mbps',
+              dataLimit: 'Unlimited',
+              isActive: true,
+              createdAt: '',
+              updatedAt: ''
+            }
+          }
+        ]
+      };
+    }
+  },
+
+  approveActivation: async (id: string): Promise<ApiResponse<any>> => {
+    const response = await privateApi.post(`/admin/activations/${id}/approve`);
+    return response.data;
+  },
+
+  rejectActivation: async (id: string, reason?: string): Promise<ApiResponse<any>> => {
+    const response = await privateApi.post(`/admin/activations/${id}/reject`, { reason });
+    return response.data;
+  },
+
+  extendGracePeriod: async (id: string): Promise<ApiResponse<any>> => {
+    const response = await privateApi.post(`/admin/activations/${id}/extend-grace`);
+    return response.data;
+  },
+
   getUsers: async (params?: { page?: number; limit?: number; search?: string }): Promise<ApiResponse<{ users: User[]; pagination: any }>> => {
     try {
       const response = await privateApi.get('/admin/users', { params });
@@ -246,39 +342,8 @@ export const adminAPI = {
       return {
         success: true,
         data: {
-          users: [
-            {
-              id: 'usr-01',
-              phone: '+254 712 345 678',
-              email: 'mwangi@gmail.com',
-              firstName: 'Mwangi',
-              lastName: 'Kariuki',
-              role: 'CUSTOMER',
-              isActive: true,
-              createdAt: new Date(Date.now() - 3600000 * 48).toISOString()
-            },
-            {
-              id: 'usr-02',
-              phone: '+254 723 456 789',
-              email: 'chebet@yahoo.com',
-              firstName: 'Faith',
-              lastName: 'Chebet',
-              role: 'CUSTOMER',
-              isActive: true,
-              createdAt: new Date(Date.now() - 3600000 * 96).toISOString()
-            },
-            {
-              id: 'usr-03',
-              phone: '+254 734 567 890',
-              email: 'otieno@outlook.com',
-              firstName: 'Brian',
-              lastName: 'Otieno',
-              role: 'CUSTOMER',
-              isActive: true,
-              createdAt: new Date(Date.now() - 3600000 * 120).toISOString()
-            }
-          ],
-          pagination: { page: 1, limit: 10, total: 3, pages: 1 }
+          users: [],
+          pagination: { page: 1, limit: 10, total: 0, pages: 1 }
         }
       };
     }
@@ -308,45 +373,16 @@ export const adminAPI = {
     return response.data;
   },
 
-  getSessions: async (params?: { page?: number; limit?: number; status?: string }): Promise<ApiResponse<{ sessions: Session[]; pagination: any }>> => {
+  getSessions: async (): Promise<ApiResponse<{ sessions: Session[]; pagination: any }>> => {
     try {
-      const response = await privateApi.get('/admin/sessions', { params });
+      const response = await privateApi.get('/admin/sessions');
       return response.data;
     } catch {
       return {
         success: true,
         data: {
-          sessions: [
-            {
-              id: 'sess-01',
-              userId: 'usr-01',
-              planId: 'plan-24hr',
-              macAddress: 'DC:A6:32:89:12:FA',
-              ipAddress: '192.168.88.145',
-              startTime: new Date(Date.now() - 3600000 * 2).toISOString(),
-              endTime: new Date(Date.now() + 3600000 * 22).toISOString(),
-              status: 'ACTIVE',
-              dataUsed: 1.4 * 1024 * 1024 * 1024,
-              sessionToken: 'kj_tok_live_01',
-              user: { phone: '+254 712 345 678', firstName: 'Mwangi', lastName: 'Kariuki' },
-              plan: { name: '24-Hour Day Pass', price: 150, speedLimit: '35 Mbps' }
-            },
-            {
-              id: 'sess-02',
-              userId: 'usr-02',
-              planId: 'plan-7day',
-              macAddress: 'A4:C3:F0:4B:92:11',
-              ipAddress: '192.168.88.172',
-              startTime: new Date(Date.now() - 3600000 * 18).toISOString(),
-              endTime: new Date(Date.now() + 3600000 * 150).toISOString(),
-              status: 'ACTIVE',
-              dataUsed: 6.8 * 1024 * 1024 * 1024,
-              sessionToken: 'kj_tok_live_02',
-              user: { phone: '+254 723 456 789', firstName: 'Faith', lastName: 'Chebet' },
-              plan: { name: 'Weekly Kijani Pro', price: 750, speedLimit: '50 Mbps' }
-            }
-          ],
-          pagination: { page: 1, limit: 10, total: 2, pages: 1 }
+          sessions: [],
+          pagination: { page: 1, limit: 10, total: 0, pages: 1 }
         }
       };
     }
@@ -357,84 +393,33 @@ export const adminAPI = {
     return response.data;
   },
 
-  getPayments: async (params?: { page?: number; limit?: number; status?: string }): Promise<ApiResponse<{ payments: Payment[]; pagination: any }>> => {
-    try {
-      const response = await privateApi.get('/admin/payments', { params });
-      return response.data;
-    } catch {
-      return {
-        success: true,
-        data: {
-          payments: [
-            {
-              id: 'pay-01',
-              userId: 'usr-01',
-              planId: 'plan-24hr',
-              amount: 150,
-              mpesaReceiptNumber: 'SHK89XJ2Q7',
-              checkoutRequestId: 'ws_CO_28082026_01',
-              status: 'COMPLETED',
-              paymentMethod: 'MPESA_STK',
-              createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-              updatedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-              user: { phone: '+254 712 345 678', firstName: 'Mwangi', lastName: 'Kariuki' },
-              plan: { name: '24-Hour Day Pass', price: 150 }
-            },
-            {
-              id: 'pay-02',
-              userId: 'usr-02',
-              planId: 'plan-7day',
-              amount: 750,
-              mpesaReceiptNumber: 'SHK90LM8P2',
-              checkoutRequestId: 'ws_CO_28082026_02',
-              status: 'COMPLETED',
-              paymentMethod: 'MPESA_STK',
-              createdAt: new Date(Date.now() - 3600000 * 8).toISOString(),
-              updatedAt: new Date(Date.now() - 3600000 * 8).toISOString(),
-              user: { phone: '+254 723 456 789', firstName: 'Faith', lastName: 'Chebet' },
-              plan: { name: 'Weekly Kijani Pro', price: 750 }
-            }
-          ],
-          pagination: { page: 1, limit: 10, total: 2, pages: 1 }
-        }
-      };
-    }
-  },
-
   getVouchers: async (): Promise<ApiResponse<Voucher[]>> => {
     try {
       const response = await privateApi.get<ApiResponse<Voucher[]>>('/admin/vouchers');
       return response.data;
     } catch {
-      return {
-        success: true,
-        data: [
-          {
-            id: 'vch-01',
-            code: 'KIJANI-9821-SPEED',
-            planId: 'plan-1hr',
-            amount: 20,
-            isRedeemed: false,
-            expiresAt: new Date(Date.now() + 3600000 * 24 * 30).toISOString(),
-            createdAt: new Date().toISOString()
-          },
-          {
-            id: 'vch-02',
-            code: 'KIJANI-5542-TURBO',
-            planId: 'plan-3hr',
-            amount: 50,
-            isRedeemed: false,
-            expiresAt: new Date(Date.now() + 3600000 * 24 * 30).toISOString(),
-            createdAt: new Date().toISOString()
-          }
-        ]
-      };
+      return { success: true, data: [] };
     }
   },
 
   generateVouchers: async (data: { planId: string; count: number; prefix?: string }): Promise<ApiResponse<Voucher[]>> => {
     const response = await privateApi.post<ApiResponse<Voucher[]>>('/admin/vouchers/generate', data);
     return response.data;
+  },
+
+  getPayments: async (): Promise<ApiResponse<{ payments: Payment[]; pagination: any }>> => {
+    try {
+      const response = await privateApi.get('/admin/payments');
+      return response.data;
+    } catch {
+      return {
+        success: true,
+        data: {
+          payments: [],
+          pagination: { page: 1, limit: 10, total: 0, pages: 1 }
+        }
+      };
+    }
   },
 
   getRouterStatus: async (): Promise<ApiResponse<RouterStatus>> => {
@@ -455,26 +440,7 @@ export const adminAPI = {
           temperature: '41°C',
           voltage: '24.2V',
           activeHotspotCount: 18,
-          interfaces: [
-            {
-              name: 'sfp-plus1 (Fiber Uplink 1Gbps)',
-              type: 'sfp-plus',
-              status: 'up',
-              rxBytes: '412.8 GB',
-              txBytes: '189.4 GB',
-              rxRate: '34.2 Mbps',
-              txRate: '12.8 Mbps'
-            },
-            {
-              name: 'ether1-gateway (Hotspot LAN)',
-              type: 'ethernet',
-              status: 'up',
-              rxBytes: '128.5 GB',
-              txBytes: '394.2 GB',
-              rxRate: '18.4 Mbps',
-              txRate: '45.1 Mbps'
-            }
-          ]
+          interfaces: []
         }
       };
     }
