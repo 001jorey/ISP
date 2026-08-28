@@ -4,7 +4,11 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
+    host: true,
     port: 3000,
+    // Allow the dev server to be reached through non-localhost hosts
+    // (LAN access from the Windows side of WSL, preview proxies, etc.)
+    allowedHosts: true,
     proxy: {
       '/api': {
         target: 'http://localhost:5000',

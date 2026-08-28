@@ -63,7 +63,7 @@ This is a comprehensive WiFi billing system designed specifically for Kenya, fea
 ### 1. Clone Repository
 ```bash
 git clone <repository-url>
-cd wifi-billing-system
+cd miktrotik-hotspot-billing
 ```
 
 ### 2. Backend Setup
@@ -194,7 +194,11 @@ The system uses Prisma ORM with the following main models:
 ### Using Docker
 ```bash
 # Build and run with Docker Compose
-docker-compose up -d
+docker compose up -d --build
+# Initialize + seed the SQLite database
+docker compose exec backend npm run db:push
+docker compose exec backend npm run db:seed
+docker compose restart backend
 ```
 
 ### Manual Deployment

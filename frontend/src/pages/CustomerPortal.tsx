@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import { Wifi, Check, Clock, Zap, CreditCard, Download, Upload, DollarSign, Phone, AlertCircle } from 'lucide-react'
+import { Wifi, Check, Clock, Zap, CreditCard, Download, Phone, AlertCircle } from 'lucide-react'
 import { formatCurrency, formatDuration, isValidKenyanPhone } from '../utils/formatters'
 import { publicAPI } from '../services/api'
 import toast from 'react-hot-toast'
-import type { Plan, PaymentStatusResponse } from '../types'
+import type { Plan } from '../types'
 
 const CustomerPortal: React.FC = () => {
   const [plans, setPlans] = useState<Plan[]>([])

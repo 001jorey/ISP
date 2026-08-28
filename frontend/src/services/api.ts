@@ -9,7 +9,9 @@ import type {
   DashboardStats,
   Session,
   Payment,
-  PaginatedResponse
+  PaginatedUsersResponse,
+  PaginatedSessionsResponse,
+  PaginatedPaymentsResponse
 } from '../types'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
@@ -98,7 +100,7 @@ export const adminAPI = {
     page?: number
     limit?: number
     search?: string
-  }): Promise<ApiResponse<PaginatedResponse<User>>> =>
+  }): Promise<ApiResponse<PaginatedUsersResponse>> =>
     privateApi.get('/admin/users', { params }).then(res => res.data),
 
   // Plans
@@ -119,7 +121,7 @@ export const adminAPI = {
     page?: number
     limit?: number
     status?: string
-  }): Promise<ApiResponse<PaginatedResponse<Session>>> =>
+  }): Promise<ApiResponse<PaginatedSessionsResponse>> =>
     privateApi.get('/admin/sessions', { params }).then(res => res.data),
 
   terminateSession: (id: string): Promise<ApiResponse<{ message: string }>> =>
@@ -130,7 +132,7 @@ export const adminAPI = {
     page?: number
     limit?: number
     status?: string
-  }): Promise<ApiResponse<PaginatedResponse<Payment>>> =>
+  }): Promise<ApiResponse<PaginatedPaymentsResponse>> =>
     privateApi.get('/admin/payments', { params }).then(res => res.data),
 
   // Router

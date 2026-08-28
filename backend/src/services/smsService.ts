@@ -4,9 +4,11 @@ class SMSService {
   private sms: any;
 
   constructor() {
+    // Fall back to placeholders so the SDK never throws at import time when
+    // .env is missing/incomplete (SMS calls will simply fail and be logged).
     const africasTalking = AfricasTalking({
-      apiKey: process.env.AFRICASTALKING_API_KEY!,
-      username: process.env.AFRICASTALKING_USERNAME!
+      apiKey: process.env.AFRICASTALKING_API_KEY || 'sandbox',
+      username: process.env.AFRICASTALKING_USERNAME || 'sandbox'
     });
     
     this.sms = africasTalking.SMS;
